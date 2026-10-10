@@ -13,13 +13,17 @@ export default function TabLayout() {
       screenOptions={{
         tabBarActiveTintColor: Colors[colorScheme ?? "light"].tint,
         tabBarShowLabel: false,
+        tabBarStyle: {
+          paddingTop: 10,
+          paddingBottom: 45,
+        }
       }}
     >
       <Tabs.Screen
         name="index"
         options={{
           title: "Campus Ride",
-          tabBarIcon: ({ color }) => <House size={23} color={color} />,
+          tabBarIcon: ({ color }) => <House size={21} color={color} />,
           headerRight: () => (
             <Link href="/message" asChild>
               <Pressable>
@@ -39,7 +43,7 @@ export default function TabLayout() {
         name="profile"
         options={{
           title: "Profile",
-          tabBarIcon: ({ color }) => <User size={23} color={color} />,
+          tabBarIcon: ({ color }) => <User size={21} color={color} />,
         }}
       />
     </Tabs>
