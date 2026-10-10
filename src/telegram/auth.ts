@@ -1,8 +1,24 @@
-import type { AuthStep, CodeDelivery, ServiceError, ServiceResult } from "@/types/domain";
+import type {
+  AuthStep,
+  CodeDelivery,
+  ServiceError,
+  ServiceResult,
+} from "@/types/domain";
 
-import { call, onUpdate, sendRaw, startClient, type StartParams } from "./client";
+import {
+  call,
+  onUpdate,
+  sendRaw,
+  startClient,
+  type StartParams,
+} from "./client";
 import { resetSavedMessages } from "./savedMessages";
-import type { TdAuthenticationCodeType, TdAuthorizationState, TdError, TdResult } from "./types";
+import type {
+  TdAuthenticationCodeType,
+  TdAuthorizationState,
+  TdError,
+  TdResult,
+} from "./types";
 
 // Authorization state machine (spec §4.1). TDLib drives it with updateAuthorizationState;
 // this module keeps the latest step and maps it to the domain AuthStep. The session lives
@@ -22,14 +38,20 @@ function emit(next: AuthStep): void {
 
 export function toServiceError(e: TdError): ServiceError {
   const kind =
-    e.kind === "flood_wait" ? "rate_limited" : e.kind === "not_ready" ? "unavailable" : "failed";
+    e.kind === "flood_wait"
+      ? "rate_limited"
+      : e.kind === "not_ready"
+        ? "unavailable"
+        : "failed";
   const error: ServiceError = { kind, code: e.message };
   if (e.retryAfter !== undefined) error.retryAfter = e.retryAfter;
   return error;
 }
 
 function toResult(r: TdResult<unknown>): ServiceResult<void> {
-  return r.ok ? { ok: true, value: undefined } : { ok: false, error: toServiceError(r.error) };
+  return r.ok
+    ? { ok: true, value: undefined }
+    : { ok: false, error: toServiceError(r.error) };
 }
 
 function delivery(type: TdAuthenticationCodeType | undefined): CodeDelivery {
@@ -107,7 +129,9 @@ async function boot(p: StartParams): Promise<void> {
 export async function startAuth(p: StartParams): Promise<void> {
   if (params) return;
   params = p;
-  unsubscribe = onUpdate("updateAuthorizationState", (u) => handleState(u.authorization_state));
+  unsubscribe = onUpdate("updateAuthorizationState", (u) =>
+    handleState(u.authorization_state),
+  );
   await boot(p);
 }
 
@@ -129,7 +153,11 @@ export async function submitPhone(
   countryCode: string,
   number: string,
 ): Promise<ServiceResult<void>> {
-  return toResult(await call((td) => td.login({ countrycode: countryCode, phoneNumber: number })));
+  return toResult(
+    await call((td) =>
+      td.login({ countrycode: countryCode, phoneNumber: number }),
+    ),
+  );
 }
 
 export async function submitCode(code: string): Promise<ServiceResult<void>> {
@@ -137,7 +165,9 @@ export async function submitCode(code: string): Promise<ServiceResult<void>> {
 }
 
 /** TDLib does the SRP 2FA exchange (CLAUDE.md §1). */
-export async function submitPassword(password: string): Promise<ServiceResult<void>> {
+export async function submitPassword(
+  password: string,
+): Promise<ServiceResult<void>> {
   return toResult(await call((td) => td.verifyPassword(password)));
 }
 

@@ -55,6 +55,7 @@ When a task says "Do the screen checks", do all of these steps:
 - [x] 1.3 Install the spec §2 libraries with `npx expo install`. Install no other library.
       Note: the gallery library is not installed. Its peer is `react-native-worklets-core`, which is
       prohibited. Decide on it in Phase 7 (task 7.9).
+      Decision (7.9): use the fork `@benschac/react-native-awesome-gallery`. See task 7.9.
 - [x] 1.4 Install `expo-dev-client` and `patch-package`. Add `"postinstall": "patch-package"`.
 - [x] 1.5 Make Patch 1 for `react-native-tdlib/react-native.config.js` (spec §3.3).
       Save it in `patches/`.
@@ -227,8 +228,8 @@ needs them.
 - [ ] 6.5 Write screen 04 and 05 `folders/index.tsx` (list and empty). Do the screen checks.
       Status: the screen and the tests are done (loaded, empty, loading, error, rate-limited,
       search). tsc, lint, and the audits pass.
-      Difference from frame 04: the search is the native `Stack.SearchBar`, not a field in the
-      content (Rules §3).
+      The search is `shared/SearchField` above the summary line, as in frame 04 (user,
+      2026-10-10: no search button in the header).
       Difference from frame 05: the circle is `bgSunken`, because `bgMuted` does not show on
       the `bgMuted` page.
       Files in the root folder are not listed. The rows do not open yet (task 7.6).
@@ -244,23 +245,76 @@ needs them.
 
 ## Phase 7 — Read path (spec §11 step 4)
 
-- [ ] 7.1 Write `src/telegram/download.ts`: `downloadFile`, priority download, cancel, progress.
-- [ ] 7.2 Write `src/media/minithumbnail.ts`: signed-int array to data URI (spec §8.2).
-- [ ] 7.3 Write `shared/Thumbnail.tsx` (`expo-image`, `recyclingKey` required).
-- [ ] 7.4 Write `src/hooks/useFolderContents.ts`.
-- [ ] 7.5 Write `gallery/GalleryGrid.tsx` and `gallery/GridCell.tsx` (FlashList v2, 3 columns).
+- [x] 7.1 Write `src/telegram/download.ts`: `downloadFile`, priority download, cancel, progress.
+      Note: the binding gives a TDLib error as a resolved `error` object, not a rejection.
+      `client.parseRaw` checks `@type`. `search.getMessages` reads the messages in batches of 100.
+- [x] 7.2 Write `src/media/minithumbnail.ts`: signed-int array to data URI (spec §8.2).
+- [x] 7.3 Write `shared/Thumbnail.tsx` (`expo-image`, `recyclingKey` required).
+- [x] 7.4 Write `src/hooks/useFolderContents.ts`.
+      Note: the list comes from `dir_index`. The file ids come from `getMessages` on each
+      open, because a TDLib file id is valid in one TDLib instance only. A thumbnail downloads
+      only when its cell is on screen.
+- [x] 7.5 Write `gallery/GalleryGrid.tsx` and `gallery/GridCell.tsx` (FlashList v2, 3 columns).
+      Why not `shared/`: only the folder screen shows a square media grid.
 - [ ] 7.6 Write screen 07 `folders/[folderId]/index.tsx`. Do the screen checks.
-- [ ] 7.7 Write `src/hooks/useSelection.ts` and `shared/Checkbox.tsx`.
+      Status: the screen, the 04 row press, and the tests are done. tsc, lint, and jest pass.
+      The audits are clean. Open:
+      - Compare to frame 07 in light and dark (native-sim needs your approval, or a device).
+      - On a device, make sure that `onViewableItemsChanged` starts the thumbnail downloads.
+        Jest has no layout, so the hook test calls `onVisible` directly.
+      Differences from frame 07, by decision:
+      - The video badge shows the play icon only. A document has no video length.
+      - The Select header action is done (task 7.8). The More menu comes with the folder
+        operations (Phase 8). It has no items before then.
+      - The upload button (FAB) comes with the write path (Phase 8).
+      - Subfolders do not show. The app makes root folders only.
+- [x] 7.7 Write `src/hooks/useSelection.ts` and `shared/Checkbox.tsx`.
+      Selection is in UI state only (spec §8.4). Android back closes the selection first.
 - [ ] 7.8 Write screen 08 (multi-select in screen 07) and `gallery/SelectionToolbar.tsx`.
       Do the screen checks.
-- [ ] 7.9 Write the viewer components: `PhotoViewer`, `VideoViewer`, `ViewerFileMeta`,
+      Status: the code and the tests are done. tsc, lint, and jest pass (255 tests). The audits
+      are clean. A long press or the Select header button starts the selection. A press
+      toggles a file. The header shows close, "N selected", and select all / select none.
+      Why `SelectionToolbar` is not `shared/`: it is the only in-screen action bar with a main
+      action and a delete circle.
+      Open:
+      - Compare to frame 08 in light and dark (native-sim needs your approval, or a device).
+      - Download is disabled. Connect it in task 7.12 (`useDownloads`). Add the hint
+        "4 files download in parallel" then, from the real concurrency.
+      - Delete is disabled. It is a Telegram write, so it comes with the trash (Phase 8).
+- [x] 7.9 Write the viewer components: `PhotoViewer`, `VideoViewer`, `ViewerFileMeta`,
       `ViewerFilmstrip`, `ViewerActionRow`.
+      Status: done. tsc, lint, and jest pass (273 tests). The audits are clean.
+      - The gallery is `@benschac/react-native-awesome-gallery` 0.4.4. It is a fork that uses
+        `react-native-worklets`, not `react-native-worklets-core`. Its peer range does not
+        include worklets 0.10, so `package.json` has an `overrides` entry. `npm ls` shows one
+        worklets 0.10.1.
+      - 📱 The gallery is not verified with Reanimated 4 and bridgeless (spec §12.4). Do a
+        swipe, pinch, and double-tap check on a device in task 7.10.
+      - The pager fills the screen. The header (transparent) and `ViewerActionRow` sit on top
+        of it, so a tap can hide them.
+      - A video page shows its poster. On the open page, `PhotoViewer` shows the `video` slot.
+        Zoom is off on a video page.
+      - `VideoViewer` uses a TextureView, because a SurfaceView does not move with the pager.
+      - New: `viewer/VideoScrubber.tsx` (10 controls). It is in the CLAUDE.md tree.
+      - `shared/ProgressBar.tsx` is done early (task 7.13 needs it too).
+      - The 10 action row has the 09 padding (26), not 20 + 26. Then the buttons do not move
+        when the user swipes from a photo to a video.
+      - New tokens: `viewerDanger`, `viewerTrack`, `viewerScrim`. New `Button` variants
+        `viewer` and `viewerDestructive`, and `iconPosition="top"`.
+      For task 7.10:
+      - Make the player in the screen or a hook (`useVideoPlayer`), with a
+        `timeUpdateEventInterval`. Read its events with `player.addListener`. Send the same
+        player to `VideoViewer` and the play times to `VideoScrubber`.
+      - Set the header options for 09/10 (CLAUDE.md §5) and a `Screen` with the viewer
+        background.
 - [ ] 7.10 Write screens 09 and 10 `viewer/[folderId]/[messageId]/index.tsx`.
        Do the screen checks.
 - [ ] 7.11 Write screen 11 `folders/[folderId]/[messageId]/index.tsx` (unsupported-file sheet).
        Do the screen checks.
 - [ ] 7.12 Write `src/hooks/useDownloads.ts`. Add the Downloads tab badge (hide it at zero).
 - [ ] 7.13 Write `shared/ProgressBar.tsx` and `transfers/TransferRow.tsx`.
+       Status: `ProgressBar` is done (task 7.9). Use `tone="accent"`.
 - [ ] 7.14 Write screen 12 `transfers/downloads/index.tsx` and `transfers/index.tsx` (redirect).
        Do the screen checks.
 - [ ] 7.15 Write screen 14 (selection mode in screen 12). Do the screen checks.

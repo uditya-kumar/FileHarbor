@@ -7,6 +7,16 @@ const viewer = {
   viewerBorder: "#2A2A2A",
   viewerText: "#F5F5F5",
   viewerTextSecondary: "#A3A3A0",
+  // 09/10 Delete: a lighter red than danger, for contrast on the dark viewer.
+  viewerDanger: "#FF6B5E",
+  // 10 scrubber: the part that has not played, white at 24 %.
+  viewerTrack: "#FFFFFF3D",
+  // 10 play button: textPrimary at 35 % over the video.
+  viewerScrim: "#19191859",
+  // 07 video badge: textPrimary at 60 % on a photo, with white text. Same in both schemes,
+  // because it sits on the photo, not on the page.
+  mediaBadge: "#19191899",
+  onMediaBadge: "#FFFFFF",
 } as const;
 
 const light = {

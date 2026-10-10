@@ -13,6 +13,7 @@
     "postinstall": "patch-package"
   },
   "dependencies": {
+    "@benschac/react-native-awesome-gallery": "^0.4.4",
     "@shopify/flash-list": "2.0.2",
     "expo": "^57.0.25",
     "expo-constants": "~57.0.19",
@@ -77,6 +78,9 @@
     ]
   },
   "overrides": {
-    "zod-validation-error": "^4.0.0"
+    "zod-validation-error": "^4.0.0",
+    "@benschac/react-native-awesome-gallery": {
+      "react-native-worklets": "$react-native-worklets"
+    }
   }
 }

@@ -13,8 +13,16 @@ import { useColorScheme } from "@/hooks/useColorScheme";
 import { Icon, type IconName } from "./Icon";
 
 type Variant =
-  "primary" | "secondary" | "destructive" | "outline" | "ghost" | "header";
-type Size = "lg" | "md" | "sm";
+  | "primary"
+  | "secondary"
+  | "destructive"
+  | "outline"
+  | "ghost"
+  | "header"
+  | "viewer"
+  | "viewerDestructive";
+/** "pill": 52 high and fully round (08 action bar). With no label it is a 52 circle. */
+type Size = "lg" | "md" | "sm" | "pill";
 
 type Props = {
   label?: string;
@@ -22,6 +30,8 @@ type Props = {
   variant?: Variant;
   size?: Size;
   icon?: IconName;
+  /** "top" puts a small label under the icon (09 viewer actions). */
+  iconPosition?: "left" | "top";
   loading?: boolean;
   disabled?: boolean;
   fullWidth?: boolean;
@@ -33,6 +43,8 @@ type Look = {
   bg?: string;
   border?: string;
   fg: string;
+  /** The label colour when it is not fg. */
+  labelFg?: string;
   weight: "400" | "500" | "600";
 };
 
@@ -73,6 +85,15 @@ function lookFor(
     case "header":
       // An action in the native header (04 new folder): the header tint, no box.
       return { fg: colors.textPrimary, weight: "500" };
+    case "viewer":
+      // On the dark viewer in both schemes: a white icon over a dimmer label.
+      return {
+        fg: colors.viewerText,
+        labelFg: colors.viewerTextSecondary,
+        weight: "500",
+      };
+    case "viewerDestructive":
+      return { fg: colors.viewerDanger, weight: "500" };
   }
 }
 
@@ -82,6 +103,7 @@ export function Button({
   variant = "primary",
   size = "lg",
   icon,
+  iconPosition = "left",
   loading = false,
   disabled = false,
   fullWidth = false,
@@ -90,13 +112,36 @@ export function Button({
   const { colors } = useColorScheme();
   const look = lookFor(variant, colors, disabled);
   const ghost = variant === "ghost";
-  // ghost and header have no box, so they ignore size.
-  const bare = ghost || variant === "header";
+  const top = iconPosition === "top";
+  // ghost, header, and the viewer variants have no box, so they ignore size.
+  const bare =
+    ghost ||
+    variant === "header" ||
+    variant === "viewer" ||
+    variant === "viewerDestructive";
   const inactive = disabled || loading;
-  const fontSize =
-    ghost && size === "sm" ? 13 : size === "sm" ? 14 : ghost ? 14 : 15;
-  const iconSize =
-    variant === "header" ? 24 : ghost ? 14 : size === "sm" ? 16 : 17;
+  const fontSize = top
+    ? 10
+    : ghost && size === "sm"
+      ? 13
+      : size === "sm"
+        ? 14
+        : ghost
+          ? 14
+          : 15;
+  const iconSize = top
+    ? Layout.viewer.actionIcon
+    : bare && !ghost
+      ? 24
+      : ghost
+        ? 14
+        : size === "sm"
+          ? 16
+          : size === "pill"
+            ? label
+              ? 18
+              : 19
+            : 17;
 
   return (
     <Pressable
@@ -109,6 +154,7 @@ export function Button({
       style={({ pressed }) => [
         styles.base,
         !bare && sizeStyles[size],
+        !bare && size === "pill" && !label && styles.circle,
         fullWidth && styles.fullWidth,
         {
           backgroundColor: look.bg,
@@ -121,10 +167,22 @@ export function Button({
       {loading ? (
         <ActivityIndicator color={look.fg} />
       ) : (
-        <View style={[styles.content, ghost && styles.contentGhost]}>
+        <View
+          style={[
+            styles.content,
+            ghost && styles.contentGhost,
+            top && styles.contentTop,
+          ]}
+        >
           {icon ? <Icon name={icon} size={iconSize} color={look.fg} /> : null}
           {label ? (
-            <Text style={{ color: look.fg, fontSize, fontWeight: look.weight }}>
+            <Text
+              style={{
+                color: look.labelFg ?? look.fg,
+                fontSize,
+                fontWeight: look.weight,
+              }}
+            >
               {label}
             </Text>
           ) : null}
@@ -137,8 +195,10 @@ export function Button({
 const styles = StyleSheet.create({
   base: { alignItems: "center", justifyContent: "center" },
   fullWidth: { alignSelf: "stretch" },
+  circle: { width: Layout.control.height, paddingHorizontal: 0 },
   content: { flexDirection: "row", alignItems: "center", gap: 8 },
   contentGhost: { gap: 6 },
+  contentTop: { flexDirection: "column", gap: Layout.viewer.actionGap },
 });
 
 const sizeStyles = StyleSheet.create({
@@ -151,6 +211,11 @@ const sizeStyles = StyleSheet.create({
     height: Layout.control.buttonHeightCompact,
     paddingHorizontal: 18,
     borderRadius: Layout.radius.card,
+  },
+  pill: {
+    height: Layout.control.height,
+    paddingHorizontal: 18,
+    borderRadius: Layout.radius.pill,
   },
   sm: {
     paddingVertical: 12,

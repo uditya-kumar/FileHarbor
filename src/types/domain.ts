@@ -56,6 +56,24 @@ export type IndexedFile = {
   mimeType: string;
 };
 
+/** How the app shows a file (spec §8.5): photo → expo-image, video → expo-video, other → sheet 11. */
+export type MediaKind = "photo" | "video" | "other";
+
+/** A file in a folder screen (07): the cached row plus its current Telegram file data. */
+export type FolderFile = IndexedFile & {
+  kind: MediaKind;
+  /** The handle for a download. It is valid until the app restarts; each folder open reads it again. */
+  fileId: number;
+  /** A file:// URI when the whole file is on the device. */
+  localUri: string | null;
+  /** The 320 px thumbnail. null when the upload had no thumbnail. */
+  thumbnailFileId: number | null;
+  /** A file:// URI when the thumbnail is on the device. */
+  thumbnailUri: string | null;
+  /** A data URI of the ~40 px image in the message. It shows before the thumbnail. */
+  placeholderUri: string | null;
+};
+
 /** One folder path in dir_index: the files directly in it. */
 export type DirSummary = {
   dirPath: string;

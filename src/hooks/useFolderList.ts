@@ -2,6 +2,7 @@ import { useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { ROOT_DIR_PATH } from "@/format/caption";
+import { formatBytes, plural } from "@/format/units";
 import { getChildFolders } from "@/index/db";
 import { syncIndex } from "@/index/sync";
 import type { FolderSummary, ServiceError } from "@/types/domain";
@@ -30,23 +31,6 @@ export type FolderListStatus =
   | "empty"
   /** The first sync failed and there is nothing in the cache to show. */
   | "error";
-
-const UNITS = ["B", "KB", "MB", "GB", "TB"];
-
-function formatBytes(bytes: number): string {
-  let value = bytes;
-  let unit = 0;
-  while (value >= 1024 && unit < UNITS.length - 1) {
-    value /= 1024;
-    unit++;
-  }
-  const digits = unit === 0 || value >= 100 ? 0 : 1;
-  return `${value.toFixed(digits)} ${UNITS[unit]}`;
-}
-
-function plural(n: number, one: string, many: string): string {
-  return `${n} ${n === 1 ? one : many}`;
-}
 
 function toRow(f: FolderSummary): FolderRow {
   return {

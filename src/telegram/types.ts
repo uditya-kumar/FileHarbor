@@ -24,7 +24,8 @@ export type TdError = {
   retryAfter?: number;
 };
 
-export type TdResult<T> = { ok: true; value: T } | { ok: false; error: TdError };
+export type TdResult<T> =
+  { ok: true; value: T } | { ok: false; error: TdError };
 
 // ---------- Authorization ----------
 
@@ -44,7 +45,10 @@ export type TdAuthenticationCodeInfo = {
 export type TdAuthorizationState =
   | { "@type": "authorizationStateWaitTdlibParameters" }
   | { "@type": "authorizationStateWaitPhoneNumber" }
-  | { "@type": "authorizationStateWaitCode"; code_info?: TdAuthenticationCodeInfo }
+  | {
+      "@type": "authorizationStateWaitCode";
+      code_info?: TdAuthenticationCodeInfo;
+    }
   | {
       "@type": "authorizationStateWaitPassword";
       password_hint?: string;
@@ -75,13 +79,49 @@ export type TdChat = { "@type": "chat"; id: number };
 
 export type TdFormattedText = { "@type": "formattedText"; text: string };
 
-export type TdFile = { "@type": "file"; id: number; size: number; expected_size: number };
+export type TdLocalFile = {
+  /** Absolute path in TDLib's files directory. "" until a part is on the device. */
+  path: string;
+  is_downloading_active: boolean;
+  is_downloading_completed: boolean;
+  downloaded_size: number;
+};
+
+export type TdFile = {
+  "@type": "file";
+  /** Valid in this TDLib instance only. Read it again from the message after a restart. */
+  id: number;
+  size: number;
+  expected_size: number;
+  /** Absent in old fixtures. Every file from TDLib has it. */
+  local?: TdLocalFile;
+};
+
+export type TdThumbnail = {
+  "@type": "thumbnail";
+  width: number;
+  height: number;
+  file: TdFile;
+};
+
+/**
+ * The ~40 px JPEG inside the message (spec §8.1). The binding has no byte[] adapter, so `data`
+ * is an array of signed ints, not base64 (spec §8.2). A string is accepted in case that changes.
+ */
+export type TdMinithumbnail = {
+  "@type": "minithumbnail";
+  width: number;
+  height: number;
+  data: number[] | string;
+};
 
 export type TdDocument = {
   "@type": "document";
   file_name: string;
   mime_type: string;
   document: TdFile;
+  thumbnail?: TdThumbnail | null;
+  minithumbnail?: TdMinithumbnail | null;
 };
 
 export type TdMessageDocument = {
@@ -100,7 +140,10 @@ export type TdMessage = {
   content: TdObject & Record<string, unknown>;
 };
 
-export type TdUpdateNewMessage = { "@type": "updateNewMessage"; message: TdMessage };
+export type TdUpdateNewMessage = {
+  "@type": "updateNewMessage";
+  message: TdMessage;
+};
 
 export type TdUpdateMessageSendSucceeded = {
   "@type": "updateMessageSendSucceeded";
@@ -115,10 +158,20 @@ export type TdUpdateMessageSendFailed = {
   error: { code: number; message: string };
 };
 
+/** getMessages result. A message that does not exist is null. */
+export type TdMessages = {
+  "@type": "messages";
+  total_count: number;
+  messages: (TdMessage | null)[];
+};
+
+export type TdUpdateFile = { "@type": "updateFile"; file: TdFile };
+
 /** Update types that `onUpdate` can type. Add an entry when a module reads a new update. */
 export type TdUpdateMap = {
   updateAuthorizationState: TdUpdateAuthorizationState;
   updateNewMessage: TdUpdateNewMessage;
   updateMessageSendSucceeded: TdUpdateMessageSendSucceeded;
   updateMessageSendFailed: TdUpdateMessageSendFailed;
+  updateFile: TdUpdateFile;
 };

@@ -5,9 +5,9 @@ import { Button } from "@components/fileHarbourComponent/shared/Button";
 import { ListRow } from "@components/fileHarbourComponent/shared/ListRow";
 import { RowList } from "@components/fileHarbourComponent/shared/RowList";
 import { Screen } from "@components/fileHarbourComponent/shared/Screen";
+import { SearchField } from "@components/fileHarbourComponent/shared/SearchField";
 import { SectionHeader } from "@components/fileHarbourComponent/shared/SectionHeader";
 import { TitleBlock } from "@components/fileHarbourComponent/shared/TitleBlock";
-import { useColorScheme } from "@/hooks/useColorScheme";
 import { useFolderList, type FolderListNotice } from "@/hooks/useFolderList";
 
 // 04 folder list and 05 empty state. The folders in the root come from the captions (spec §1).
@@ -24,7 +24,6 @@ function NoticeBanner({ notice }: { notice: FolderListNotice }) {
 
 export default function FoldersScreen() {
   const router = useRouter();
-  const { colors } = useColorScheme();
   const list = useFolderList();
 
   const openNewFolder = (): void => router.push("/folders/new");
@@ -43,21 +42,6 @@ export default function FoldersScreen() {
           ),
         }}
       />
-      {list.status === "list" ? (
-        // Expo's native header search (CLAUDE.md §3), not the in-content field of frame 04.
-        <Stack.SearchBar
-          placeholder="Search folders by name"
-          onChangeText={(e) => list.setQuery(e.nativeEvent.text)}
-          onClose={() => list.setQuery("")}
-          autoCapitalize="none"
-          hideWhenScrolling={false}
-          textColor={colors.textPrimary}
-          hintTextColor={colors.textTertiary}
-          headerIconColor={colors.textPrimary}
-          tintColor={colors.accent}
-        />
-      ) : null}
-
       {list.status === "loading" ? (
         <TitleBlock
           align="center"
@@ -112,6 +96,11 @@ export default function FoldersScreen() {
           onRefresh={list.refresh}
           header={
             <>
+              <SearchField
+                value={list.query}
+                onChangeText={list.setQuery}
+                placeholder="Search folders by name"
+              />
               <SectionHeader title={list.summary} />
               {list.notice ? <NoticeBanner notice={list.notice} /> : null}
               {list.noMatchText ? (
@@ -119,13 +108,18 @@ export default function FoldersScreen() {
               ) : null}
             </>
           }
-          // The folder screen (07) comes in task 7.6.
           renderItem={({ item }) => (
             <ListRow
               icon={item.kind === "documents" ? "file-text" : "folder"}
               title={item.title}
               subtitle={item.subtitle}
               trailing="chevron"
+              onPress={() =>
+                router.push({
+                  pathname: "/folders/[folderId]",
+                  params: { folderId: item.dirPath },
+                })
+              }
             />
           )}
         />

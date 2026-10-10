@@ -149,10 +149,11 @@ FileHarbor/
 │  │  │  ├─ ListRow.tsx        leading, title, subtitle, value, trailing
 │  │  │  │                     chevron|switch|stepper|icon|checkbox|none, selected
 │  │  │  ├─ SectionHeader.tsx  level section|sheet
+│  │  │  ├─ SearchField.tsx    search icon, clear button (04); not InputField: no label
 │  │  │  ├─ RowList.tsx        FlashList of card rows, header, pull to refresh
 │  │  │  ├─ ButtonRow.tsx      equal-width buttons (06 Cancel / Create)
 │  │  │  ├─ Banner.tsx         tone info|warn|danger|success
-│  │  │  ├─ ProgressBar.tsx
+│  │  │  ├─ ProgressBar.tsx    tone accent|viewer, knob, onSeek (10 scrubber, 12/13 rows)
 │  │  │  ├─ Checkbox.tsx
 │  │  │  ├─ Pill.tsx
 │  │  │  ├─ SegmentedControl.tsx
@@ -170,6 +171,7 @@ FileHarbor/
 │  │  │  ├─ VideoViewer.tsx    expo-video
 │  │  │  ├─ ViewerFileMeta.tsx
 │  │  │  ├─ ViewerFilmstrip.tsx
+│  │  │  ├─ VideoScrubber.tsx  10 buffer line, seek bar, times
 │  │  │  └─ ViewerActionRow.tsx
 │  │  └─ transfers/
 │  │     ├─ TransferRow.tsx    ListRow + ProgressBar
@@ -195,6 +197,7 @@ FileHarbor/
 │  │  ├─ savedMessages.ts
 │  │  └─ types.ts
 │  ├─ format/caption.ts        caption parse + serialise
+│  ├─ format/units.ts          size and count display text ("2.4 GB", "3 items")
 │  ├─ media/  picker.ts  thumbnail.ts  minithumbnail.ts  hash.ts
 │  ├─ transfer/  queue.ts  foregroundService.ts
 │  ├─ index/  db.ts  sync.ts

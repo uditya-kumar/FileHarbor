@@ -81,19 +81,30 @@ describe("Folders 04 — list", () => {
     expect(mockRouter.push).toHaveBeenCalledWith("/folders/new");
   });
 
-  it("filters by name from the header search", async () => {
+  it("opens the folder grid (07) from a row", async () => {
+    await render(<FoldersScreen />);
+    await fireEvent.press(
+      await screen.findByRole("button", {
+        name: "Goa 2024, 148 items · 2.4 GB",
+      }),
+    );
+    expect(mockRouter.push).toHaveBeenCalledWith({
+      pathname: "/folders/[folderId]",
+      params: { folderId: "Goa 2024" },
+    });
+  });
+
+  it("filters by name from the search field above the summary", async () => {
     await render(<FoldersScreen />);
     await screen.findByText("Goa 2024");
-    expect(mockStack.searchBar?.placeholder).toBe("Search folders by name");
-    await act(async () =>
-      mockStack.searchBar?.onChangeText?.({ nativeEvent: { text: " work" } }),
-    );
+    const search = screen.getByLabelText("Search folders by name");
+    await fireEvent.changeText(search, " work");
     expect(screen.getByText("1 Folder · 300 MB")).toBeOnTheScreen();
     expect(screen.queryByText("Goa 2024")).not.toBeOnTheScreen();
-    await act(async () =>
-      mockStack.searchBar?.onChangeText?.({ nativeEvent: { text: "zzz" } }),
-    );
+    await fireEvent.changeText(search, "zzz");
     expect(screen.getByText('No folder name has "zzz".')).toBeOnTheScreen();
+    await fireEvent.press(screen.getByRole("button", { name: "Clear search" }));
+    expect(screen.getByText("Goa 2024")).toBeOnTheScreen();
   });
 
   it("keeps the list and shows a warn banner when Telegram rate-limits", async () => {
@@ -134,7 +145,9 @@ describe("Folders 05 — empty, loading, and error", () => {
         "Create a folder, then upload photos and videos into it.",
       ),
     ).toBeOnTheScreen();
-    expect(mockStack.searchBar).toBeNull();
+    expect(
+      screen.queryByLabelText("Search folders by name"),
+    ).not.toBeOnTheScreen();
     await fireEvent.press(screen.getByRole("button", { name: "New folder" }));
     expect(mockRouter.push).toHaveBeenCalledWith("/folders/new");
   });

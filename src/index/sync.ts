@@ -1,11 +1,15 @@
 import { parseCaption } from "@/format/caption";
-import { replaceDirIndex } from "@/index/db";
+import { getFilesInDir, replaceDirIndex } from "@/index/db";
+import { minithumbnailUri } from "@/media/minithumbnail";
 import { toServiceError } from "@/telegram/auth";
+import { downloadFile } from "@/telegram/download";
 import { getSavedMessagesChatId } from "@/telegram/savedMessages";
-import { getFullHistory } from "@/telegram/search";
-import type { TdMessage, TdMessageDocument } from "@/telegram/types";
+import { getFullHistory, getMessages } from "@/telegram/search";
+import type { TdFile, TdMessage, TdMessageDocument } from "@/telegram/types";
 import type {
+  FolderFile,
   IndexedFile,
+  MediaKind,
   ServiceResult,
   SyncReport,
   SyncSkip,
@@ -105,4 +109,106 @@ export function syncIndex(
     running = null;
   });
   return running;
+}
+
+// ---------- Read path (spec §8): one folder, with the current file data ----------
+
+// spec §8.5 names .jpeg, .png, .heic, and .mp4. The others also decode on Android (Glide,
+// ExoPlayer). The extension is the fallback when Telegram gives no useful MIME type.
+const PHOTO_EXT = ["jpg", "jpeg", "png", "heic", "heif", "webp", "gif"];
+const VIDEO_EXT = ["mp4", "mov", "m4v", "webm", "3gp", "mkv"];
+const PHOTO_MIME = [
+  "image/jpeg",
+  "image/png",
+  "image/heic",
+  "image/heif",
+  "image/webp",
+  "image/gif",
+];
+const VIDEO_MIME = [
+  "video/mp4",
+  "video/quicktime",
+  "video/webm",
+  "video/3gpp",
+  "video/x-matroska",
+];
+
+export function mediaKindOf(name: string, mimeType: string): MediaKind {
+  const mime = mimeType.toLowerCase();
+  if (PHOTO_MIME.includes(mime)) return "photo";
+  if (VIDEO_MIME.includes(mime)) return "video";
+  const dot = name.lastIndexOf(".");
+  const ext = dot < 0 ? "" : name.slice(dot + 1).toLowerCase();
+  if (PHOTO_EXT.includes(ext)) return "photo";
+  if (VIDEO_EXT.includes(ext)) return "video";
+  return "other";
+}
+
+function completedUri(file: TdFile | undefined): string | null {
+  const local = file?.local;
+  return local?.is_downloading_completed && local.path
+    ? `file://${local.path}`
+    : null;
+}
+
+/** The current file data of one indexed row. null when the message is no longer a document. */
+export function toFolderFile(
+  row: IndexedFile,
+  message: TdMessage,
+): FolderFile | null {
+  if (message.content["@type"] !== "messageDocument") return null;
+  const document = (message.content as unknown as TdMessageDocument).document;
+  if (!document?.document) return null;
+  const thumbnail = document.thumbnail?.file;
+  return {
+    ...row,
+    kind: mediaKindOf(row.name, row.mimeType),
+    fileId: document.document.id,
+    localUri: completedUri(document.document),
+    thumbnailFileId: thumbnail?.id ?? null,
+    thumbnailUri: completedUri(thumbnail),
+    placeholderUri: minithumbnailUri(document.minithumbnail?.data),
+  };
+}
+
+/**
+ * The files of one folder, newest first. The list comes from dir_index; the file data comes
+ * from TDLib, because a TDLib file id is valid in one TDLib instance only. A file deleted on
+ * Telegram is left out; the next sync removes its row.
+ */
+export async function loadFolderFiles(
+  dirPath: string,
+): Promise<ServiceResult<FolderFile[]>> {
+  const rows = await getFilesInDir(dirPath);
+  if (!rows.ok)
+    return { ok: false, error: { kind: "failed", code: rows.message } };
+  if (rows.value.length === 0) return { ok: true, value: [] };
+
+  const chat = await getSavedMessagesChatId();
+  if (!chat.ok) return { ok: false, error: toServiceError(chat.error) };
+  const messages = await getMessages(
+    chat.value,
+    rows.value.map((r) => r.messageId),
+  );
+  if (!messages.ok) return { ok: false, error: toServiceError(messages.error) };
+
+  const files: FolderFile[] = [];
+  rows.value.forEach((row, i) => {
+    const message = messages.value[i];
+    const file = message ? toFolderFile(row, message) : null;
+    if (file) files.push(file);
+  });
+  return { ok: true, value: files };
+}
+
+/** Downloads a thumbnail (a few KB; TDLib caches it) and gives its file:// URI (spec §8.1). */
+export async function loadThumbnail(
+  fileId: number,
+): Promise<ServiceResult<string>> {
+  const res = await downloadFile(fileId);
+  if (!res.ok) return { ok: false, error: toServiceError(res.error) };
+  const uri = completedUri(res.value);
+  return uri
+    ? { ok: true, value: uri }
+    : { ok: false, error: { kind: "failed", code: "NO_LOCAL_PATH" } };
 }
