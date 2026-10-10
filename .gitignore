@@ -43,5 +43,8 @@ yarn-error.*
 
 #agent skills
 .agents
-.github
+.claude
+.github/*
+!.github/workflows/
+!.github/native-sim/
 .vscode
