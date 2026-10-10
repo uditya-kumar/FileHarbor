@@ -1,0 +1,67 @@
+diff --git a/node_modules/react-native-tdlib/android/src/main/java/com/reactnativetdlib/tdlibclient/TdLibModule.java b/node_modules/react-native-tdlib/android/src/main/java/com/reactnativetdlib/tdlibclient/TdLibModule.java
+index 30b643d..344396c 100644
+--- a/node_modules/react-native-tdlib/android/src/main/java/com/reactnativetdlib/tdlibclient/TdLibModule.java
++++ b/node_modules/react-native-tdlib/android/src/main/java/com/reactnativetdlib/tdlibclient/TdLibModule.java
+@@ -52,13 +52,20 @@ import androidx.annotation.NonNull;
+ 
+ public class TdLibModule extends ReactContextBaseJavaModule {
+     private static final String TAG = "TdLibModule";
+-    private Client client;
++    // Patch 4 (reload-safe client): static, so a JS reload (new module instance) reuses the
++    // running client. A second Client.create on the same database fails with
++    // "Can't lock file td.binlog, because it is already in use by current program".
++    private static volatile Client client;
++    // The context of the newest module instance. The update handler of the static client
++    // emits here, not to the context of the instance that created it (dead after a reload).
++    private static volatile ReactApplicationContext activeContext;
+     private final Gson gson = TdLibJson.GSON;
+ 
+     private final ReactApplicationContext reactContext;
+     public TdLibModule(ReactApplicationContext context) {
+         super(context);
+         this.reactContext = context;
++        activeContext = context;
+     }
+ 
+     @Override
+@@ -218,9 +225,12 @@ public class TdLibModule extends ReactContextBaseJavaModule {
+                         map.putString("type", type);
+                         map.putString("raw", json);
+ 
+-                        getReactApplicationContext()
+-                            .getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter.class)
+-                            .emit("tdlib-update", map);
++                        ReactApplicationContext ctx = activeContext;
++                        if (ctx != null && ctx.hasActiveReactInstance()) {
++                            ctx
++                                .getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter.class)
++                                .emit("tdlib-update", map);
++                        }
+ 
+                         // Tear down the client after TDLib fully closes so the next
+                         // startTdLib creates a fresh one (logout/destroy path).
+diff --git a/node_modules/react-native-tdlib/react-native.config.js b/node_modules/react-native-tdlib/react-native.config.js
+index c959257..2d33587 100644
+--- a/node_modules/react-native-tdlib/react-native.config.js
++++ b/node_modules/react-native-tdlib/react-native.config.js
+@@ -1,15 +1,13 @@
+-const path = require('path');
+-
++// Patch 1 (spec §3.3): no `sourceDir`. expo-modules-autolinking does
++// path.join(packageRoot, sourceDir), so an absolute sourceDir doubles the path and
++// the android entry is silently dropped (TdLib is undefined at runtime).
+ module.exports = {
+     dependency: {
+         platforms: {
+-            // iOS metadata is auto-discovered from `react-native-tdlib.podspec`.
+-            // The schema in @react-native-community/cli v20+ rejects `podspecPath`
+-            // and `sourceDir` here and silently drops the entire `platforms` map,
+-            // which breaks autolinking on RN >= 0.78.
+             ios: {},
+             android: {
+-                sourceDir: path.join(__dirname, 'android'),
++                // Keep packageImportPath: auto-discovery infers the wrong class
++                // (com.reactnativetdlib.TdLibPackage) from the manifest package.
+                 packageImportPath: 'import com.reactnativetdlib.tdlibclient.TdLibPackage;',
+                 packageInstance: 'new TdLibPackage()',
+             },

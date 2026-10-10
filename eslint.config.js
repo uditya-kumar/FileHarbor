@@ -1,12 +1,11 @@
 // https://docs.expo.dev/guides/using-eslint/
+// React Compiler rules come from eslint-plugin-react-hooks v7 inside eslint-config-expo.
 const { defineConfig } = require("eslint/config");
 const expoConfig = require("eslint-config-expo/flat");
-const reactCompiler = require("eslint-plugin-react-compiler");
 
 module.exports = defineConfig([
   expoConfig,
-  reactCompiler.configs.recommended,
   {
-    ignores: ["dist/*"],
+    ignores: ["dist/*", "android/*", "ios/*"],
   },
 ]);

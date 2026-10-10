@@ -68,7 +68,8 @@ Imports go down only. An upward import is a defect.
 **Services**
 - Only `src/telegram` knows TDLib. It has no app concepts (no "folder", no "gallery").
 - `src/telegram/types.ts` holds TDLib shapes only. `src/types/domain.ts` holds app types.
-- Map TDLib shapes to domain types only in `src/index/sync.ts` and `src/transfer/queue.ts`.
+- Map TDLib shapes to domain types only in `src/index/sync.ts`, `src/transfer/queue.ts`, and
+  `src/telegram/auth.ts` (auth steps and errors only).
 - Screens, hooks, and components use domain types only.
 
 ## 3. Components: reuse
@@ -326,7 +327,12 @@ Spec §12 items are not verified. Verify each on a device before you use it.
 - Use named exports. Use a default export only in route files.
 - File names: `camelCase.ts` for services and hooks, `PascalCase.tsx` for components, lowercase
   for route folders.
-- Use the path aliases `@/*`, `@components/*`, `@assets/*`. Do not use `../../..`.
+- Import from `src/` with `@/` (for example, `import { Colors } from "@/constants/Colors"`).
+  Do not use relative paths (`./`, `../`) across folders. The aliases are in `tsconfig.json`:
+  `@/*` → `src/*`, `@components/*` → `src/components/*`, `@assets/*` → `assets/*`.
+- Exception: `app.config.ts` runs in plain Node. It cannot use `@/` or import any `src/` file.
+  It can have the native splash and adaptive-icon colours as literals. Keep them equal to
+  `Colors.light.bg` and `Colors.dark.bg`.
 - Comments tell why. Add a spec section reference to the caption format, the send correlation,
   and each pacing constant.
 - Show errors as UI states. Do not throw across the service boundary.

@@ -1,40 +1,21 @@
-import { Link, Stack } from 'expo-router';
-import { StyleSheet } from 'react-native';
+import { Stack, useRouter } from "expo-router";
 
-import { Text, View } from '@/components/Themed';
+import { Button } from "@components/fileHarbourComponent/shared/Button";
+import { FormBody } from "@components/fileHarbourComponent/shared/FormBody";
+import { Screen } from "@components/fileHarbourComponent/shared/Screen";
+import { TitleBlock } from "@components/fileHarbourComponent/shared/TitleBlock";
 
 export default function NotFoundScreen() {
-  return (
-    <>
-      <Stack.Screen options={{ title: 'Oops!' }} />
-      <View style={styles.container}>
-        <Text style={styles.title}>This screen doesn't exist.</Text>
+  const router = useRouter();
+  // "/" is the gate: it sends the user to the tabs or to the auth group from the auth state.
+  const goBack = (): void => (router.canGoBack() ? router.back() : router.replace("/"));
 
-        <Link href="/" style={styles.link}>
-          <Text style={styles.linkText}>Go to home screen!</Text>
-        </Link>
-      </View>
-    </>
+  return (
+    <Screen footer={<Button label="Go back" onPress={goBack} fullWidth />}>
+      <Stack.Screen options={{ title: "" }} />
+      <FormBody>
+        <TitleBlock title="Page not found" body="This screen does not exist." />
+      </FormBody>
+    </Screen>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 20,
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: 'bold',
-  },
-  link: {
-    marginTop: 15,
-    paddingVertical: 15,
-  },
-  linkText: {
-    fontSize: 14,
-    color: '#2e78b7',
-  },
-});
