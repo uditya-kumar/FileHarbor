@@ -12,18 +12,22 @@ type Props = {
   /** Shown in a sunken tile before the text. */
   icon?: IconName;
   trailing?: "chevron" | "none";
+  /** "card": a white card (04 folder row). "plain": no card and a larger muted tile (11 file). */
+  variant?: "card" | "plain";
   onPress?: () => void;
 };
 
-// A white card row (04 folder row). Other trailing kinds come with the screens that need them.
+// One row of an icon and text. Other trailing kinds come with the screens that need them.
 export function ListRow({
   title,
   subtitle,
   icon,
   trailing = "none",
+  variant = "card",
   onPress,
 }: Props) {
   const { colors } = useColorScheme();
+  const plain = variant === "plain";
 
   return (
     <Pressable
@@ -31,17 +35,30 @@ export function ListRow({
       disabled={!onPress}
       accessibilityRole={onPress ? "button" : undefined}
       accessibilityLabel={subtitle ? `${title}, ${subtitle}` : title}
-      style={({ pressed }) => [
-        styles.row,
-        {
-          backgroundColor: pressed ? colors.bgMuted : colors.bg,
-          borderColor: colors.border,
-        },
-      ]}
+      style={({ pressed }) =>
+        plain
+          ? styles.rowPlain
+          : [
+              styles.row,
+              {
+                backgroundColor: pressed ? colors.bgMuted : colors.bg,
+                borderColor: colors.border,
+              },
+            ]
+      }
     >
       {icon ? (
-        <View style={[styles.tile, { backgroundColor: colors.bgSunken }]}>
-          <Icon name={icon} size={19} color={colors.textSecondary} />
+        <View
+          style={[
+            plain ? styles.tilePlain : styles.tile,
+            { backgroundColor: plain ? colors.bgMuted : colors.bgSunken },
+          ]}
+        >
+          <Icon
+            name={icon}
+            size={plain ? Layout.sheet.fileIcon : 19}
+            color={colors.textSecondary}
+          />
         </View>
       ) : null}
       <View style={styles.text}>
@@ -76,9 +93,21 @@ const styles = StyleSheet.create({
     borderWidth: Layout.hairline,
     borderRadius: Layout.radius.card,
   },
+  rowPlain: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Layout.sheet.fileGap,
+  },
   tile: {
     width: Layout.list.tile,
     height: Layout.list.tile,
+    borderRadius: Layout.radius.banner,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  tilePlain: {
+    width: Layout.sheet.fileTile,
+    height: Layout.sheet.fileTile,
     borderRadius: Layout.radius.banner,
     alignItems: "center",
     justifyContent: "center",

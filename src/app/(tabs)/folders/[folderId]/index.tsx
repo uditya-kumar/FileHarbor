@@ -11,8 +11,8 @@ import { useFolderContents } from "@/hooks/useFolderContents";
 import { useSelection } from "@/hooks/useSelection";
 
 // 07 folder grid and 08 multi-select. `folderId` is the folder path from the captions, e.g.
-// "Holiday/Beach" (spec §1). A photo or video cell opens the viewer (09, 10); sheet 11 for other
-// files comes in task 7.11. The More menu comes with the folder operations (Phase 8).
+// "Holiday/Beach" (spec §1). A photo or video cell opens the viewer (09, 10); another file opens
+// sheet 11 (spec §8.5). The More menu comes with the folder operations (Phase 8).
 
 export default function FolderScreen() {
   const router = useRouter();
@@ -28,12 +28,16 @@ export default function FolderScreen() {
   const rateLimited = notice?.kind === "rate_limited";
 
   const pressCell = (key: string): void => {
-    if (selection.active) selection.toggle(key);
-    else if (folder.opensInViewer(key))
-      router.push({
-        pathname: "/viewer/[folderId]/[messageId]",
-        params: { folderId: folderId ?? "", messageId: key },
-      });
+    if (selection.active) {
+      selection.toggle(key);
+      return;
+    }
+    const params = { folderId: folderId ?? "", messageId: key };
+    router.push(
+      folder.opensInViewer(key)
+        ? { pathname: "/viewer/[folderId]/[messageId]", params }
+        : { pathname: "/folders/[folderId]/[messageId]", params },
+    );
   };
   const longPressCell = (key: string): void => {
     if (selection.active) selection.toggle(key);

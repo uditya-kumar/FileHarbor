@@ -31,6 +31,10 @@ export const Layout = {
     grabberWidth: 38,
     grabberHeight: 4,
     actionGap: 10,
+    // 11: the file row, a muted tile with no card.
+    fileTile: 46,
+    fileIcon: 22,
+    fileGap: 12,
   },
   // 07: a 3-column grid, 6 apart, inside the 20 page padding.
   grid: {

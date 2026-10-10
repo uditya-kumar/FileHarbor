@@ -369,8 +369,38 @@ needs them.
         - compare 09 and 10 with `Design.pen`.
       - For task 7.12: `useDownloads` must not cancel a download that the Downloads tab started.
         The viewer cancels only the downloads that it started.
-- [ ] 7.11 Write screen 11 `folders/[folderId]/[messageId]/index.tsx` (unsupported-file sheet).
+- [x] 7.11 Write screen 11 `folders/[folderId]/[messageId]/index.tsx` (unsupported-file sheet).
        Do the screen checks.
+      Status: done. tsc, lint, and jest pass (325 tests). The audits are clean.
+      - In 07, a tap on a file that is not a photo or a video opens sheet 11 (spec §8.5).
+      - The sheet is a form sheet in the folders Stack, with the 06 options (`fitToContents`).
+        It has `SheetGrabber` for Android.
+      - The sheet shows the file row ("4.2 MB · PDF · 12 Aug 2024"), the note, "Download to
+        device", and "Cancel".
+      - "Download to device":
+        1. The Android folder picker opens (`Directory.pickDirectoryAsync`, `expo-file-system`,
+           spec §2). The media library cannot save a PDF or a ZIP.
+        2. If the file is not on the device, TDLib downloads it (`viewFile`). The note shows
+           "Downloading 42% from Telegram."
+        3. The app copies the file into the folder with the caption name. The folder gives a
+           new name ("Notes (1).pdf") if the name is in use. Then the note shows "Saved in
+           "Download"." and Cancel becomes Done.
+      - `File.copy()` into a picked folder uses the TDLib file name, not the caption name. So
+        `src/media/saveToDevice.ts` copies the bytes in 1 MB parts. This is a local copy, not
+        a Telegram transfer.
+      - If the user closes the picker, nothing occurs. If the sheet closes during a download,
+        the download stops. The parts on the device stay.
+      - A rate limit shows in `warn` with the wait time. A download or save error shows in
+        `danger`. A file that is not in the folder now shows "This file is not here now."
+      - New: `useFileSheet.ts`, `media/saveToDevice.ts`, the domain type `SaveFolder`. They are
+        not in the CLAUDE.md tree. `ListRow` has a new `variant="plain"` (no card, a 46 muted
+        tile). New `Layout.sheet` tokens: `fileTile`, `fileIcon`, `fileGap`.
+      - The row icon is always `file-text`, the same as the design.
+      - 📱 Device test (the user): Resume.pdf saves in Download and opens from the Files app.
+        A closed picker keeps the sheet as it was. ✅
+      - 📱 Do on a device: compare 11 with `Design.pen` (light and dark).
+      - A picker cancel gives `ERR_PICKER_CANCELLED`. expo-modules-core makes this code from
+        the class name `PickerCancelledException`.
 - [ ] 7.12 Write `src/hooks/useDownloads.ts`. Add the Downloads tab badge (hide it at zero).
 - [ ] 7.13 Write `shared/ProgressBar.tsx` and `transfers/TransferRow.tsx`.
        Status: `ProgressBar` is done (task 7.9). Use `tone="accent"`.

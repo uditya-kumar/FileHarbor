@@ -35,6 +35,17 @@ export default function FoldersLayout() {
           contentStyle: { backgroundColor: colors.bg },
         }}
       />
+      <Stack.Screen
+        name="[folderId]/[messageId]/index"
+        options={{
+          presentation: "formSheet",
+          headerShown: false,
+          sheetAllowedDetents: "fitToContents",
+          sheetCornerRadius: Layout.sheet.radius,
+          sheetGrabberVisible: true,
+          contentStyle: { backgroundColor: colors.bg },
+        }}
+      />
     </Stack>
   );
 }

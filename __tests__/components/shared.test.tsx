@@ -282,6 +282,24 @@ describe("ListRow", () => {
     await render(<ListRow title="Goa 2024" />);
     expect(screen.queryByRole("button")).not.toBeOnTheScreen();
   });
+
+  it("has no card in the plain variant (11 file row)", async () => {
+    await render(
+      <ListRow
+        variant="plain"
+        icon="file-text"
+        title="Q3_Report_final.pdf"
+        subtitle="4.2 MB · PDF · 12 Aug 2024"
+      />,
+    );
+    expect(screen.getByText("4.2 MB · PDF · 12 Aug 2024")).toBeOnTheScreen();
+    const row = StyleSheet.flatten(
+      screen.getByLabelText("Q3_Report_final.pdf, 4.2 MB · PDF · 12 Aug 2024")
+        .props.style,
+    );
+    expect(row.borderWidth).toBeUndefined();
+    expect(row.backgroundColor).toBeUndefined();
+  });
 });
 
 describe("RowList", () => {

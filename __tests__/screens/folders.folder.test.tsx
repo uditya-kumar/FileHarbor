@@ -82,10 +82,13 @@ describe("Folder 07 — open a file", () => {
     });
   });
 
-  it("does not open the viewer for another file (sheet 11 comes in 7.11)", async () => {
+  it("opens sheet 11 for another file", async () => {
     await render(<FolderScreen />);
     await fireEvent.press(await screen.findByLabelText("File, notes.pdf"));
-    expect(mockRouter.push).not.toHaveBeenCalled();
+    expect(mockRouter.push).toHaveBeenCalledWith({
+      pathname: "/folders/[folderId]/[messageId]",
+      params: { folderId: "Goa 2024/Beach", messageId: "1" },
+    });
   });
 
   it("selects, and does not open, a file during the selection", async () => {

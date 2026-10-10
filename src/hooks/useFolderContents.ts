@@ -217,7 +217,7 @@ export function useFolderContents(
     selection: selected ? selectionOf(all, selected) : null,
     /** 07 "148 items · 2.4 GB". */
     summary: `${plural(all.length, "item", "items")} · ${formatBytes(totalSize)}`,
-    /** True when the viewer (09, 10) opens the cell. Other files open sheet 11 (7.11). */
+    /** True when the viewer (09, 10) opens the cell. Other files open sheet 11. */
     opensInViewer: (key: string): boolean =>
       all.some((f) => String(f.messageId) === key && f.kind !== "other"),
     notice,

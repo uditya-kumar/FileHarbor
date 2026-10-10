@@ -84,6 +84,14 @@ export type FileProgress = {
   localUri: string | null;
 };
 
+/** A folder on the device that the user picked to save a file in (sheet 11). */
+export type SaveFolder = {
+  /** A content:// URI. */
+  uri: string;
+  /** The folder name to show, e.g. "Download". */
+  name: string;
+};
+
 /** One folder path in dir_index: the files directly in it. */
 export type DirSummary = {
   dirPath: string;
