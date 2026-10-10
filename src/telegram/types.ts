@@ -65,7 +65,30 @@ export type TdUpdateAuthorizationState = {
   authorization_state: TdAuthorizationState;
 };
 
+// ---------- Users and chats ----------
+
+export type TdUser = { "@type": "user"; id: number };
+
+export type TdChat = { "@type": "chat"; id: number };
+
 // ---------- Messages ----------
+
+export type TdFormattedText = { "@type": "formattedText"; text: string };
+
+export type TdFile = { "@type": "file"; id: number; size: number; expected_size: number };
+
+export type TdDocument = {
+  "@type": "document";
+  file_name: string;
+  mime_type: string;
+  document: TdFile;
+};
+
+export type TdMessageDocument = {
+  "@type": "messageDocument";
+  document: TdDocument;
+  caption: TdFormattedText;
+};
 
 export type TdMessage = {
   "@type": "message";

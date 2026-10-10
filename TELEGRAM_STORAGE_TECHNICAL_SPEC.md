@@ -15,8 +15,9 @@ Messages** over MTProto, on-device. Android first; iOS later.
 Facts tagged **[verified]** were confirmed against a real build or against source in
 `react-native-tdlib@2.3.0`. Trust them.
 
-The target account already holds ~600 real files written by an existing web app. Mobile writes
-**must** stay byte-compatible with it.
+The target account holds ~600 files from the unlim-cloud web app. **Decision (2026-10-10):** the
+app does not support the web app or its caption formats. The user uploads those files again from
+the app. The app ignores the old messages.
 
 ---
 
@@ -25,31 +26,45 @@ The target account already holds ~600 real files written by an existing web app.
 Backend chat is the user's own Saved Messages. Its `chat_id` **equals the user's own user ID**.
 
 ```
-getProfile()  →  User.id  →  getChat(id)   // load before use
+getProfile()  →  User.id  →  createPrivateChat(id)   // loads the chat; getChat(id) alone
+                                                     // gives "Chat not found" on a new session
 ```
 
-One file = one message = `inputMessageDocument`. The folder tree lives in the message caption:
+One file = one message = `inputMessageDocument`. The folder tree and the file name live in the
+message caption:
 
 ```
-dir--<path>--/dir        e.g.  dir--0/-OfbIM-MZ14I7p79snqB--/dir
-                                    ^root  ^folder id
+fileharbor:1:<JSON>      e.g.  fileharbor:1:{"path":["Holiday","Beach"],"name":"IMG_001.jpg"}
+           ^version             path: folder names from the root down ([] = root)
 ```
+
+- Folders are identified by name. In the app, a dir path is the names joined with `/`; the root
+  is `""`. A name is 1–255 characters, with no `/`, no control character, no space at the start or
+  the end, and not `.` or `..`. The caption is at most 1024 characters (Telegram, no Premium).
+- `serialise` writes `JSON.stringify({path, name})`: fixed key order, no spaces. `parse` accepts
+  any valid JSON with the two keys, and ignores unknown keys.
+- The caption `name` is the name the app shows, not the document `file_name`. A rename edits the
+  caption only.
+- A caption without the `fileharbor:1:` prefix is not a FileHarbor file (a note, or a web app
+  file). The sync counts it as "other".
 
 **Orders:**
 
-1. Implement `parse` and `serialise` for the caption format as a pair in `format/dirPath.ts`, with
-   round-trip tests. Keep the format **byte-identical** to the web app's. A mismatch does not
-   throw — it silently files uploads into folders the web UI cannot display, and there is no
-   transaction to roll back.
-2. Treat a folder as a **local record only**. It has no server object. Creating a folder writes a
-   `dir_index` row; it materialises on Telegram when the first file is uploaded with that caption.
-   Empty folders exist only on-device.
+1. Implement `parse` and `serialise` for the caption format as a pair in `format/caption.ts`, with
+   round-trip tests. After the first real upload, the format is fixed: change it only with a new
+   version prefix, and keep the parser for each old version. A sent caption cannot be changed in
+   bulk, and there is no transaction to roll back.
+2. The captions are the **only** record of the folder tree. Do not keep it in a server, a manifest
+   message, or local storage: if the user clears app data, nothing is lost. A folder has no server
+   object. It exists on Telegram when the first file with that path is uploaded. An empty folder
+   exists only on-device, and it is lost if app data is cleared. Renaming or moving a folder edits
+   the caption of each file in it.
 3. Rebuild the entire tree by scanning captions on a fresh install. **DO NOT** write a manifest
    file.
 4. Upload as **documents**, byte-exact. **DO NOT** re-compress.
 5. **DO NOT** add client-side encryption. Filenames, captions and thumbnails are plaintext on
    Telegram's servers, Saved Messages is not E2E-encrypted, and encrypting would break the
-   existing 600 files and the web app. This is a v2 format decision, not a flag.
+   format. This is a v2 format decision, not a flag.
 
 ---
 
@@ -254,7 +269,7 @@ TdLib.td_json_client_send({
     document:  { '@type': 'inputFileLocal', path: localPath },
     thumbnail: { thumbnail: { '@type': 'inputFileLocal', path: thumbPath },
                  width: 320, height: 320 },
-    caption: { '@type': 'formattedText', text: `dir--${dirPath}--/dir` },
+    caption: { '@type': 'formattedText', text: serialiseCaption({ dirPath, name }) },  // §1
     disable_content_type_detection: true,
   },
 });
@@ -278,9 +293,9 @@ TdLib.td_json_client_send({
 
 ### 4.4 Listing
 
-- One folder: `searchChatMessages({chat_id, query: 'dir--0/-OfbIM...', limit: 100})` — filters
-  captions server-side, so rendering a folder does not page all 600 messages.
-- Full sync: `getChatHistory`, 100/call, ~7 calls for 600 files.
+- One folder: read the local `dir_index` cache (§5). `searchChatMessages` results need raw-call
+  results, which the binding does not give without a patch (TaskList 5.0).
+- Full sync: `getChatHistory`, 100/call, ~7 calls for 600 files. It rebuilds `dir_index`.
 
 ---
 
@@ -334,10 +349,9 @@ cannot raise Telegram's ceiling.
 
 **Album batching is the 10× lever.** `sendMessageAlbum` groups up to **10 documents per message**:
 600 → 60 messages, pacing floor ~25 min → ~3 min. Album items keep individual captions, so the
-`dir--…--/dir` scheme survives. Not in the wrapped API — use raw `td_json_client_send`.
-**Validate against the live account before adopting it.** The existing data is one file per
-message, so the web app may assume that when parsing; if it does, batching produces files the web
-UI cannot see, and testing only the mobile app will not catch it.
+§1 caption scheme survives. Not in the wrapped API — use raw `td_json_client_send`.
+**Validate on the live account before adopting it:** after a fresh sync, each album item must
+show in its folder.
 
 Selection and staging orders — these are correctness requirements, not optimisations:
 
@@ -427,7 +441,7 @@ src/
     download.ts      downloadFile + updateFile progress
     search.ts        searchChatMessages / getChatHistory
   format/
-    dirPath.ts       parse + serialise "dir--…--/dir"   ← round-trip tested
+    caption.ts       parse + serialise "fileharbor:1:{…}"   ← round-trip tested
   media/
     picker.ts        media-library pagination
     thumbnail.ts     thumb generation
@@ -457,7 +471,7 @@ src/
 | Bridge stalls on large files | awaiting `sendMessage` | fire-and-forget; drive UI from `updateFile` |
 | Duplicates after interruption | non-idempotent retry | search-before-send |
 | Upload seems to succeed but never confirms | raw send has no `@extra` correlation | watch `updateNewMessage` → `updateMessageSendSucceeded` |
-| Web app can't see mobile uploads | caption format or album grouping mismatch | round-trip tests against the live account |
+| Upload missing from its folder after a sync | caption does not parse, or album item lost its caption | round-trip tests; check the sync report |
 | Storage fills up | TDLib files-dir cache growth | `optimizeStorage` periodically |
 | Recycled grid cells show wrong image | missing `recyclingKey` | set it on every `expo-image` |
 | Auth loop on relaunch | TDLib DB dir wiped, or key lost if Patch 2 applied | persist the key in SecureStore |
@@ -470,16 +484,17 @@ src/
 1. **Apply Patch 1 and prove TDLib works at runtime on a device.** The build is already verified;
    bridgeless runtime is not. Bar to clear: dev client on a real device, `startTdLib`, log in by
    phone, assert `tdlib-update` events arrive. Everything else is wasted effort until this passes.
-2. **Parse the existing 600 captions.** Render the tree and diff it against what the web app shows.
+2. **Caption format.** Parse, serialise, round-trip tests, and the sync report on the live account.
 3. Auth state machine. Confirm relaunch does not re-login.
 4. Read path: list Saved Messages, thumbnails, download, verify SHA-256 on the 51.8 MB video.
-5. Write path: **one** file, correct caption — then confirm it appears correctly **in the web app**.
+5. Write path: **one** file, correct caption — then confirm the caption in Telegram, and the file in
+   its folder after a fresh sync.
 6. Upload queue with persistence. Test by killing the app mid-batch.
 7. Bulk 600. Measure real flood behaviour, then decide album batching on live evidence.
 8. Android foreground service; gallery polish, folder ops, trash.
 
-**Step 2 strictly before step 5.** A wrong caption format scatters 600 real files into folders the
-web app cannot display, with no rollback.
+**Step 2 strictly before step 5.** A wrong caption format puts 600 real files into the wrong
+folders, with no rollback.
 
 ---
 
@@ -494,7 +509,7 @@ web app cannot display, with no rollback.
    certainly need copying to a real path first.
 4. **`react-native-awesome-gallery` under Reanimated v4 + bridgeless**, alongside the TDLib legacy
    bridge module.
-5. **Album batching compatibility** with the existing web app (§6).
+5. **Album batching** keeps each item's caption (§6).
 
 ---
 

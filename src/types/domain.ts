@@ -39,3 +39,37 @@ export type AuthStep =
   /** A state the app does not handle, e.g. email login or new-account registration. */
   | { step: "unsupported"; state: string }
   | { step: "unavailable"; error: ServiceError };
+
+/** One file in a folder: a row of the local dir_index (spec §5). */
+export type IndexedFile = {
+  messageId: number;
+  /** The folder from the caption, e.g. "Holiday/Beach". The root is "" (format/caption.ts). */
+  dirPath: string;
+  /** The file name from the caption. */
+  name: string;
+  /** Unix seconds. */
+  date: number;
+};
+
+/** One folder path in dir_index and its file count. */
+export type DirSummary = { dirPath: string; fileCount: number };
+
+/** A FileHarbor caption that the sync did not index. The sync report shows it (TaskList 5.7). */
+export type SyncSkip = {
+  messageId: number;
+  caption: string;
+  reason:
+    /** The caption has the FileHarbor prefix but does not parse. */
+    | "bad_caption"
+    /** The caption parses, but the message is not a document (e.g. a photo or a video). */
+    | "not_document";
+};
+
+export type SyncReport = {
+  /** All messages in Saved Messages. */
+  scanned: number;
+  indexed: number;
+  /** Messages with no FileHarbor caption (notes, files from other apps). Not an error. */
+  other: number;
+  skipped: SyncSkip[];
+};

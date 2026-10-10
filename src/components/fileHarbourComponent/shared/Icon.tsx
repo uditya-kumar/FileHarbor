@@ -3,10 +3,12 @@ import {
   Cloud,
   Eye,
   EyeOff,
+  Folder,
   FolderPlus,
   LogOut,
   ShieldCheck,
   Timer,
+  TriangleAlert,
   type LucideIcon,
 } from "lucide-react-native";
 
@@ -17,10 +19,12 @@ const icons = {
   cloud: Cloud,
   eye: Eye,
   "eye-off": EyeOff,
+  folder: Folder,
   "folder-plus": FolderPlus,
   "log-out": LogOut,
   "shield-check": ShieldCheck,
   timer: Timer,
+  "triangle-alert": TriangleAlert,
 } satisfies Record<string, LucideIcon>;
 
 export type IconName = keyof typeof icons;

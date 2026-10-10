@@ -16,9 +16,13 @@ user's Telegram **Saved Messages**. It uses `react-native-tdlib` on the device.
 - Do not build a server, relay, or proxy. Do not use the Telegram Bot API.
 - Do not write chunking, resume, `FLOOD_WAIT` backoff, DC migration, file-reference refresh, or
   SRP 2FA. TDLib does these.
-- Do not encrypt uploads. Encryption breaks the ~600 existing files and the web app.
-- Do not change the caption format `dir--<path>--/dir`. It must be byte-identical to the web app.
-  A mismatch puts files into folders that the web app cannot show. There is no rollback.
+- Do not encrypt uploads. Encryption is a format v2 decision (spec §1), not a flag.
+- The caption is the only record of the folder tree: `fileharbor:1:{"path":[…],"name":"…"}`
+  (spec §1). Do not keep the tree in a server, a manifest message, or local storage. Local
+  tables are caches that a rescan rebuilds.
+- After the first real upload, do not change the caption format. Add a new version, and keep the
+  parser for each old version. A sent caption cannot be changed in bulk. There is no rollback.
+- The app does not support the unlim-cloud web app or its captions (`dir--…--/dir`, gallery).
 - Do not make more than one `tdlib-update` subscription. It is in `src/telegram/client.ts` only.
 - Do not set upload concurrency above 4. This is account safety.
 - Do not send a session string or the TDLib database off the device.
@@ -188,13 +192,13 @@ FileHarbor/
 │  │  ├─ search.ts
 │  │  ├─ savedMessages.ts
 │  │  └─ types.ts
-│  ├─ format/dirPath.ts        caption parse + serialise
+│  ├─ format/caption.ts        caption parse + serialise
 │  ├─ media/  picker.ts  thumbnail.ts  minithumbnail.ts  hash.ts
 │  ├─ transfer/  queue.ts  foregroundService.ts
 │  ├─ index/  db.ts  sync.ts
 │  ├─ storage/  prefs.ts (mmkv)  secrets.ts (secure-store)
 │  └─ types/domain.ts
-└─ __tests__/  format/dirPath.test.ts  screens/  components/
+└─ __tests__/  format/caption.test.ts  screens/  components/
 ```
 
 ## 5. Routes and navigation
@@ -300,20 +304,21 @@ Do these steps on each screen when you finish it. Do not wait for a batch.
 5. Audit reuse. Give each new feature-folder component a one-line reason it is not `shared/` plus
    props. Apply all §3 rules.
 
-`dirPath.ts` needs round-trip tests. Before you write upload code, compare its folder tree with
-the web app on the live account.
+`caption.ts` needs round-trip tests. Before the first real upload, the user approves the caption
+format. After that upload, the format is fixed (§1).
 
 ## 8. Build order
 
 Follow spec §11:
 
 1. Apply Patch 1. On a real device, run `startTdLib`, log in, and see `tdlib-update` events.
-2. Parse the ~600 existing captions. Compare the tree with the web app.
+2. Caption format: parse, serialise, round-trip tests, and the sync report.
 3. Auth state machine. A relaunch must not ask for login again.
 4. Read path: list, thumbnails, download. Check the SHA-256 of the 51.8 MB video.
-5. Write path: upload one file. Check it in the web app.
+5. Write path: upload one file. Check its caption in Telegram, and its folder after a fresh sync.
 6. Persistent upload queue. Kill the app during a batch to test it.
-7. Upload 600 files. Measure flood behaviour. Then decide on album batching.
+7. Upload 600 files (the user uploads the old web app files again). Measure flood behaviour.
+   Then decide on album batching.
 8. Foreground service, gallery polish, folder operations, trash.
 
 Do step 2 before step 5. You can build UI on mock data during steps 1–4. Do not connect real

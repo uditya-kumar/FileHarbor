@@ -1,6 +1,7 @@
 import type { AuthStep, CodeDelivery, ServiceError, ServiceResult } from "@/types/domain";
 
 import { call, onUpdate, sendRaw, startClient, type StartParams } from "./client";
+import { resetSavedMessages } from "./savedMessages";
 import type { TdAuthenticationCodeType, TdAuthorizationState, TdError, TdResult } from "./types";
 
 // Authorization state machine (spec §4.1). TDLib drives it with updateAuthorizationState;
@@ -78,7 +79,11 @@ function handleState(state: TdAuthorizationState): void {
   emit(toAuthStep(state));
   // The binding nulls the native client on Closed (spec §4.1). Start a fresh one, so the
   // user gets the phone step after a log-out.
-  if (state["@type"] === "authorizationStateClosed" && params) void boot(params);
+  // The next account has its own Saved Messages chat.
+  if (state["@type"] === "authorizationStateClosed") {
+    resetSavedMessages();
+    if (params) void boot(params);
+  }
 }
 
 async function boot(p: StartParams): Promise<void> {

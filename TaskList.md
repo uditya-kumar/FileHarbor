@@ -11,7 +11,6 @@ References:
 Legend:
 - 📱 = needs a real Android device
 - 👤 = needs an action or an approval from the user
-- 🌐 = needs a comparison with the web app on the live account
 
 ---
 
@@ -135,8 +134,11 @@ needs them.
       `ready`, and to `/phone` in every other state. The root `Stack` guards `(auth)` with
       `!signedIn` and `(tabs)` with `signedIn`, and `unstable_settings.anchor` is `index`, so a
       denied guard returns to the gate. Test: `__tests__/screens/index.test.tsx`.
-- [ ] 4.9 📱 Log in with phone, code, and 2FA password.
-- [ ] 4.10 📱 Close and open the app again. Make sure that it does not ask for login again.
+- [x] 4.9 📱 Log in with phone, code, and 2FA password.
+      Result (2026-10-10): the login with phone, code, and 2FA password works on a real device.
+- [x] 4.10 📱 Close and open the app again. Make sure that it does not ask for login again.
+       Result (2026-10-10): after a force-stop, the app opens on the Folders tab. It does not ask
+       for login again.
 
 ## Phase 5 — Caption format (spec §11 step 2 — do before Phase 8)
 
@@ -145,18 +147,60 @@ needs them.
 > of a raw call (for example `searchChatMessages`, or an error from `sendMessage`) never gets to
 > JS. Only updates get to JS. Spec §3.2.3 and §4.4 do not tell this.
 
-- [ ] 5.0 👤 Decide how to get raw-call results. Option A: Patch 3 — give `td_json_client_send`
+- [x] 5.0 👤 Decide how to get raw-call results. Option A: Patch 3 — give `td_json_client_send`
       a result handler that emits the result on `tdlib-update`. Option B: use only wrapped
       methods (`getChatHistory`) and the local `dir_index`. Search-before-retry (spec §5.3)
       then uses `dir_index` after a resync.
-- [ ] 5.1 Write `src/format/dirPath.ts`: `parse` and `serialise` for `dir--<path>--/dir`.
-- [ ] 5.2 Write `__tests__/format/dirPath.test.ts` with round-trip tests and bad-input tests.
-- [ ] 5.3 Write `src/telegram/search.ts`: `getChatHistory` (100 per call), `searchChatMessages`.
-- [ ] 5.4 Write `src/telegram/savedMessages.ts`: get the Saved Messages chat id (spec §1).
-- [ ] 5.5 Write `src/index/db.ts` with the `dir_index` table (spec §5).
-- [ ] 5.6 Write `src/index/sync.ts`: scan all captions, fill `dir_index`.
-- [ ] 5.7 📱 Parse the ~600 existing captions. Record the captions that do not parse.
-- [ ] 5.8 🌐👤 Compare the folder tree with the web app. Record each difference. Fix them.
+      Decision (2026-10-10): Option B. The user accepts Patch 3 only if it is necessary, and it
+      is not: a folder reads `dir_index` (a full scan is about 7 calls), send results come as
+      updates (`updateMessageSendSucceeded` / `Failed`), and search-before-retry (task 9.2)
+      reads the newest `getChatHistory` page, because a lost confirmation is a recent message.
+      Do Patch 3 later only if a needed function gives its result only as a direct reply.
+- [x] 5.1 Write `src/format/caption.ts`: `parse` and `serialise` for the caption format (spec §1).
+      Decision (2026-10-10, user): the app does not support the unlim-cloud web app. The user
+      uploads the ~600 old files again. The caption holds the folder names and the file name:
+      `fileharbor:1:{"path":["Holiday","Beach"],"name":"IMG_001.jpg"}`. The captions are the
+      only record of the folder tree: no server, no manifest, no local record.
+      Status: `serialiseCaption` writes fixed JSON and rejects a bad name or a caption over
+      1024 characters. `parseCaption` accepts any valid JSON with `path` and `name`, and ignores
+      unknown keys. A name has no `/`, no control character, and no space at the start or end.
+      The old `dirPath.ts` (`dir--…--/dir`) is removed.
+- [x] 5.2 Write `__tests__/format/caption.test.ts` with round-trip tests and bad-input tests.
+      Status: 2000 seeded random files (Unicode, emoji, quotes, `\`, `--`) round-trip.
+- [x] 5.3 Write `src/telegram/search.ts`: `getChatHistory` (100 per call), `searchChatMessages`.
+      Status: `getHistoryPage` and `getFullHistory` are done and tested. A short page is not the
+      end; only an empty page is. No `searchChatMessages`: its result cannot get to JS without
+      Patch 3 (decision 5.0).
+- [x] 5.4 Write `src/telegram/savedMessages.ts`: get the Saved Messages chat id (spec §1).
+      Status: `getProfile` → `createPrivateChat(id)`, cached. `auth.ts` clears the cache on
+      `Closed`. Fix (2026-10-10): `getChat(id)` gave "Chat not found" on the device, because
+      TDLib had not loaded the chat. `createPrivateChat` loads it.
+- [x] 5.5 Write `src/index/db.ts` with the `dir_index` table (spec §5).
+      Status: `fileharbor.db`, migrations by `PRAGMA user_version`. `replaceDirIndex` writes one
+      exclusive transaction. Open: call `clearIndex` on log-out (from the hook layer, task 11.4).
+- [x] 5.6 Write `src/index/sync.ts`: scan all captions, fill `dir_index`.
+      Status: `syncIndex` gives a `SyncReport`: scanned, indexed, other (no FileHarbor caption:
+      notes and the old web app files), and skipped (`bad_caption`, or `not_document` for a
+      FileHarbor caption on a photo or a video). A failed scan does not change `dir_index`.
+      `dir_index` is a cache. If app data is cleared, the next sync builds it again.
+- [x] 5.7 📱 Run the sync report on the live account. Record the counts.
+      Status: the Folders tab is a temporary sync report. It runs `syncIndex` and shows the
+      counts, each folder path with its file count, and each skipped caption. Task 6.5
+      replaces it. Until Phase 8 there is no FileHarbor caption, so expect 0 files and all
+      messages as "other".
+      Result (2026-10-10, device): 612 messages · 0 files · 612 other · 0 skipped. The paging
+      reads the full history. Phase 5 is complete.
+- [x] 5.8 ~~Compare the folder tree with the web app.~~ Cancelled (2026-10-10): the app does
+      not support the web app (5.1).
+- [x] 5.9 Find where the web app keeps the folder names. Decide how the app gets them.
+      Finding (2026-10-10, web app bundle `FilesView-*.js`): the web app keeps the folder tree in
+      its own Firebase Realtime Database. Its captions hold folder ids only.
+      Decision (2026-10-10, user): the caption holds the folder names (5.1). Task 6.5 can start.
+- [x] 5.10 Decide how to treat the other web app caption types (gallery, trash, favorite,
+      hidden, chunk). Decision (2026-10-10, user): no gallery uploads, and no support for these
+      captions. The sync counts them as "other".
+- [x] 5.11 👤 Approve the caption format in 5.1 before task 8.5. Approved (2026-10-10). After the first real upload,
+      change it only with a new version (Rules §1).
 
 ## Phase 6 — Tabs and folder list
 
@@ -213,7 +257,8 @@ needs them.
       `disable_content_type_detection: true`. Do not `await` the send (spec §4.2).
 - [ ] 8.4 📱 Find what `inputFileLocal` accepts on Android (spec §12.3).
 - [ ] 8.5 📱 Upload one file with the correct caption.
-- [ ] 8.6 🌐👤 Make sure that the file shows in the correct folder in the web app.
+- [ ] 8.6 📱 Check the caption in Telegram. Clear the app data, sync, and make sure that the file
+      shows in the correct folder with the correct name.
 
 ## Phase 9 — Persistent upload queue (spec §11 step 6)
 
@@ -229,8 +274,9 @@ needs them.
 
 ## Phase 10 — Bulk upload (spec §11 step 7) 📱👤
 
-- [ ] 10.1 📱 Upload 600 files. Record the flood behaviour and the total time.
-- [ ] 10.2 🌐👤 Test album batching against the web app (spec §6, §12.5).
+- [ ] 10.1 📱 Upload 600 files (the old web app files again). Record the flood behaviour and the
+      total time.
+- [ ] 10.2 📱 Test album batching: after a sync, each album item is in its folder (spec §6, §12.5).
 - [ ] 10.3 👤 Decide on album batching from the results.
 
 ## Phase 11 — Foreground service and polish (spec §11 step 8)
