@@ -40,7 +40,7 @@ export function VideoViewer({
           player={player}
           nativeControls={false}
           contentFit="contain"
-          // A SurfaceView does not move with the pager's transforms on Android.
+          // A TextureView moves and fades with the pager page like any other view.
           surfaceType="textureView"
           style={styles.video}
         />

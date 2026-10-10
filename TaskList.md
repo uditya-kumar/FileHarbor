@@ -233,8 +233,10 @@ needs them.
       Difference from frame 05: the circle is `bgSunken`, because `bgMuted` does not show on
       the `bgMuted` page.
       Files in the root folder are not listed. The rows do not open yet (task 7.6).
-      Open: 👤 compare with frames 04 and 05 in light and dark (`native-sim` needs approval,
-      or use a device).
+      Result (2026-10-10, device, dark): the user sent one photo as a file to Saved Messages, with the caption `fileharbor:1:{"path":["Shaadi"],"name":"…"}`.
+      After a refresh, 04 shows "1 Folder · 107 KB" and the row "Shaadi · 1 item · 107 KB".
+      This is the first end-to-end check of the read path: caption → sync → `dir_index` → list.
+      Open: 👤 compare with frames 04 and 05 in light (dark is checked), and the 05 empty state.
 - [ ] 6.6 Write screen 06 `folders/new/index.tsx` (form sheet).
       Status: the screen and the tests are done. tsc, lint, and the audits pass.
       A new empty folder is a `local_dir` row on this device only. Telegram has no record of it
@@ -259,9 +261,9 @@ needs them.
 - [ ] 7.6 Write screen 07 `folders/[folderId]/index.tsx`. Do the screen checks.
       Status: the screen, the 04 row press, and the tests are done. tsc, lint, and jest pass.
       The audits are clean. Open:
-      - Compare to frame 07 in light and dark (native-sim needs your approval, or a device).
-      - On a device, make sure that `onViewableItemsChanged` starts the thumbnail downloads.
-        Jest has no layout, so the hook test calls `onVisible` directly.
+      - Result (2026-10-10, device, dark): the grid shows the Shaadi photo with its
+        thumbnail. Thus `onViewableItemsChanged` starts the thumbnail download.
+      - Compare to frame 07 in light (dark is checked on the device).
       Differences from frame 07, by decision:
       - The video badge shows the play icon only. A document has no video length.
       - The Select header action is done (task 7.8). The More menu comes with the folder
@@ -278,7 +280,11 @@ needs them.
       Why `SelectionToolbar` is not `shared/`: it is the only in-screen action bar with a main
       action and a delete circle.
       Open:
-      - Compare to frame 08 in light and dark (native-sim needs your approval, or a device).
+      - Result (2026-10-10, device, dark): "0 selected" / "1 selected", "107 KB selected",
+        the selected ring and tick, "Download 1 item", and the disabled bar are correct.
+        Fix (user): the close icon touched the title. `Button headerLeading` adds the 08 gap
+        (22, `Layout.header.leadingGap`). 📱 Check it on the device.
+      - Compare to frame 08 in light (dark is checked on the device).
       - Download is disabled. Connect it in task 7.12 (`useDownloads`). Add the hint
         "4 files download in parallel" then, from the real concurrency.
       - Delete is disabled. It is a Telegram write, so it comes with the trash (Phase 8).
@@ -295,7 +301,7 @@ needs them.
         of it, so a tap can hide them.
       - A video page shows its poster. On the open page, `PhotoViewer` shows the `video` slot.
         Zoom is off on a video page.
-      - `VideoViewer` uses a TextureView, because a SurfaceView does not move with the pager.
+      - `VideoViewer` uses a TextureView, because it moves with the pager like other views.
       - New: `viewer/VideoScrubber.tsx` (10 controls). It is in the CLAUDE.md tree.
       - `shared/ProgressBar.tsx` is done early (task 7.13 needs it too).
       - The 10 action row has the 09 padding (26), not 20 + 26. Then the buttons do not move
@@ -308,8 +314,53 @@ needs them.
         player to `VideoViewer` and the play times to `VideoScrubber`.
       - Set the header options for 09/10 (CLAUDE.md §5) and a `Screen` with the viewer
         background.
-- [ ] 7.10 Write screens 09 and 10 `viewer/[folderId]/[messageId]/index.tsx`.
+- [x] 7.10 Write screens 09 and 10 `viewer/[folderId]/[messageId]/index.tsx`.
        Do the screen checks.
+      Status: done. tsc, lint, and jest pass (308 tests). The audits are clean.
+      - A photo or video cell in 07 opens the viewer. Another file does nothing until sheet 11
+        (task 7.11). During a selection, a tap selects.
+      - The route is in the root Stack, inside the signed-in guard, so it shows no tabs.
+      - The viewer pages through the photos and videos of the folder, in the 07 order. The
+        title is "3 of 148".
+      - New: `useViewer.ts` (the pages, the filmstrip, and the open file) and
+        `useVideoPlayback.ts` (the player, the play times, and seek). They are in the CLAUDE.md
+        tree.
+      - New: `viewFile` in `sync.ts`. It downloads the open file at priority 32 (spec §4.3) and
+        reports the progress from `updateFile`. It cancels the download when the page closes,
+        if the viewer started it and it is not complete.
+      - The pages near the open page show their thumbnails (±4 pages). The full photo replaces
+        the thumbnail when it is on the device. The meta line shows "Downloading 42%".
+      - The video plays only when the whole file is on the device. ExoPlayer cannot read a file
+        that TDLib still writes. While it downloads, the line over the scrubber shows
+        "Downloading 62% · from Telegram". A tap on Play waits, and the video starts when it
+        loads. True streaming needs a device test (later).
+      - The four actions show disabled:
+        - Share and Copy need a library (for example `expo-sharing`, `expo-clipboard`). Spec §2
+          does not list them. ❓ Ask the user.
+        - Save comes with the media library (task 7.16).
+        - Delete is a Telegram write (Phase 8).
+      - The Info and More header icons are not there. They come when they have a function.
+      - An error shows on the meta line (photo) or the download line (video). A rate limit shows
+        the wait time. A file that is not in the folder now shows "This file is not here now".
+      - `Screen` has a new `background="viewer"`.
+      - 📱 Device test 1 (portrait phone video):
+        - The video was very small in the centre.
+        - A tap while the video played made the screen black.
+        - The cause of the two: `PhotoViewer` put the video slot in a centring view. Then the
+          slot was only as wide as its play button. When the button hid, the width was 0.
+        - The fix: the slot fills the page. A component test checks it. (A first guess, the
+          TextureView, was wrong. The TextureView stays.)
+      - The root layout has a `GestureHandlerRootView`. Before it, the gallery gestures did not
+        work on Android. LogBox hides one dev-only warning: gesture-handler 2.32 calls
+        `findNodeHandle` in StrictMode.
+      - 📱 Do on a device:
+        - the gallery swipe, pinch, and double-tap check (spec §12.4);
+        - a HEIC photo;
+        - a video: full size, a tap while it plays, and it moves with a swipe;
+        - the SHA-256 of the 51.8 MB video (build step 4);
+        - compare 09 and 10 with `Design.pen`.
+      - For task 7.12: `useDownloads` must not cancel a download that the Downloads tab started.
+        The viewer cancels only the downloads that it started.
 - [ ] 7.11 Write screen 11 `folders/[folderId]/[messageId]/index.tsx` (unsupported-file sheet).
        Do the screen checks.
 - [ ] 7.12 Write `src/hooks/useDownloads.ts`. Add the Downloads tab badge (hide it at zero).

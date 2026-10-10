@@ -9,6 +9,8 @@ export const Layout = {
     searchHeight: 48,
   },
   section: { gap: 26, headingGap: 9 },
+  // 08: the gap from the close icon to "N selected". The Android header has none of its own.
+  header: { leadingGap: 22 },
   screen: {
     topBelowHeader: 14,
     topNoHeader: 40,

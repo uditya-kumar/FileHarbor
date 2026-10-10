@@ -66,6 +66,31 @@ describe("Button", () => {
     expect(onPress).toHaveBeenCalledTimes(1);
   });
 
+  it("keeps the 08 gap to the title only for a headerLeft button", async () => {
+    await render(
+      <>
+        <Button
+          variant="header"
+          icon="x"
+          headerLeading
+          accessibilityLabel="Close selection"
+          onPress={jest.fn()}
+        />
+        <Button
+          variant="header"
+          icon="list-checks"
+          accessibilityLabel="Select all"
+          onPress={jest.fn()}
+        />
+      </>,
+    );
+    const marginEnd = (name: string) =>
+      StyleSheet.flatten(screen.getByRole("button", { name }).props.style)
+        .marginEnd;
+    expect(marginEnd("Close selection")).toBe(22);
+    expect(marginEnd("Select all")).toBeUndefined();
+  });
+
   it("renders the pill size with a label, and as a circle with an icon only", async () => {
     const onPress = jest.fn();
     await render(

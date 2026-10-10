@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { KeyboardAvoidingView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import type { ColorTokens } from "@/constants/Colors";
 import { Layout } from "@/constants/Layout";
 import { useColorScheme } from "@/hooks/useColorScheme";
 
@@ -13,8 +14,8 @@ type Props = {
   footerNote?: string;
   /** Mirror of the Stack option. With no native header, the screen pads the status bar. */
   headerShown?: boolean;
-  /** "muted" for a page of rows (04): the rows are white on it. */
-  background?: "default" | "muted";
+  /** "muted" for a page of rows (04): the rows are white on it. "viewer": 09 and 10. */
+  background?: "default" | "muted" | "viewer";
   /**
    * Size to the content, not the window. Set it on a form sheet with
    * `sheetAllowedDetents: "fitToContents"`: that sheet cannot use flex 1. The native sheet
@@ -22,6 +23,16 @@ type Props = {
    */
   fit?: boolean;
 };
+
+/** The colour token for each background. */
+const BACKGROUND = {
+  default: "bg",
+  muted: "bgMuted",
+  viewer: "viewerBg",
+} as const satisfies Record<
+  NonNullable<Props["background"]>,
+  keyof ColorTokens
+>;
 
 export function Screen({
   children,
@@ -41,7 +52,7 @@ export function Screen({
       style={[
         fill,
         {
-          backgroundColor: background === "muted" ? colors.bgMuted : colors.bg,
+          backgroundColor: colors[BACKGROUND[background]],
           paddingTop: headerShown ? 0 : insets.top,
           paddingLeft: insets.left,
           paddingRight: insets.right,

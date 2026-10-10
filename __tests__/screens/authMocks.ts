@@ -44,6 +44,7 @@ export const mockStack: {
   options: {
     title?: string;
     headerBackVisible?: boolean;
+    headerShown?: boolean;
     headerLeft?: () => ReactNode;
     headerRight?: () => ReactNode;
   };

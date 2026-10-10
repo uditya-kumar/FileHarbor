@@ -203,6 +203,11 @@ describe("PhotoViewer", () => {
       />,
     );
     expect(screen.getByText("Video slot")).toBeOnTheScreen();
+    // The slot fills the page. A centring parent gave the video only the width of its play
+    // button (device test, 7.10).
+    const wrapper = screen.getByText("Video slot").parent;
+    expect(wrapper).toHaveStyle({ flex: 1 });
+    expect(wrapper).not.toHaveStyle({ alignItems: "center" });
     expect(screen.queryByLabelText("Video 2")).toBeNull();
     expect(lastGallery().pinchEnabled).toBe(false);
     expect(lastGallery().doubleTapEnabled).toBe(false);

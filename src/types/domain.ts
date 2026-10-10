@@ -74,6 +74,16 @@ export type FolderFile = IndexedFile & {
   placeholderUri: string | null;
 };
 
+/** The download state of one file (09, 10, and later the Downloads tab). */
+export type FileProgress = {
+  /** Bytes on the device. */
+  downloaded: number;
+  /** Bytes. 0 when unknown. */
+  size: number;
+  /** A file:// URI when the whole file is on the device. */
+  localUri: string | null;
+};
+
 /** One folder path in dir_index: the files directly in it. */
 export type DirSummary = {
   dirPath: string;

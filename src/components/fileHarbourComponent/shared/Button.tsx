@@ -35,6 +35,11 @@ type Props = {
   loading?: boolean;
   disabled?: boolean;
   fullWidth?: boolean;
+  /**
+   * In `headerLeft`: keeps the 08 gap to the title. Android puts the title right after the
+   * left slot, with no margin.
+   */
+  headerLeading?: boolean;
   /** Required when there is no label. */
   accessibilityLabel?: string;
 };
@@ -107,6 +112,7 @@ export function Button({
   loading = false,
   disabled = false,
   fullWidth = false,
+  headerLeading = false,
   accessibilityLabel,
 }: Props) {
   const { colors } = useColorScheme();
@@ -156,6 +162,7 @@ export function Button({
         !bare && sizeStyles[size],
         !bare && size === "pill" && !label && styles.circle,
         fullWidth && styles.fullWidth,
+        headerLeading && styles.headerLeading,
         {
           backgroundColor: look.bg,
           borderColor: look.border,
@@ -195,6 +202,7 @@ export function Button({
 const styles = StyleSheet.create({
   base: { alignItems: "center", justifyContent: "center" },
   fullWidth: { alignSelf: "stretch" },
+  headerLeading: { marginEnd: Layout.header.leadingGap },
   circle: { width: Layout.control.height, paddingHorizontal: 0 },
   content: { flexDirection: "row", alignItems: "center", gap: 8 },
   contentGhost: { gap: 6 },

@@ -1,4 +1,4 @@
-import { Stack, useLocalSearchParams } from "expo-router";
+import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 
 import { GalleryGrid } from "@components/fileHarbourComponent/gallery/GalleryGrid";
 import { SelectionToolbar } from "@components/fileHarbourComponent/gallery/SelectionToolbar";
@@ -11,10 +11,11 @@ import { useFolderContents } from "@/hooks/useFolderContents";
 import { useSelection } from "@/hooks/useSelection";
 
 // 07 folder grid and 08 multi-select. `folderId` is the folder path from the captions, e.g.
-// "Holiday/Beach" (spec §1). The viewer (09, 10) and sheet 11 open from a cell in tasks 7.10
-// and 7.11. The More menu comes with the folder operations (Phase 8).
+// "Holiday/Beach" (spec §1). A photo or video cell opens the viewer (09, 10); sheet 11 for other
+// files comes in task 7.11. The More menu comes with the folder operations (Phase 8).
 
 export default function FolderScreen() {
+  const router = useRouter();
   const { folderId } = useLocalSearchParams<{ folderId: string }>();
   const selection = useSelection();
   const folder = useFolderContents(
@@ -28,6 +29,11 @@ export default function FolderScreen() {
 
   const pressCell = (key: string): void => {
     if (selection.active) selection.toggle(key);
+    else if (folder.opensInViewer(key))
+      router.push({
+        pathname: "/viewer/[folderId]/[messageId]",
+        params: { folderId: folderId ?? "", messageId: key },
+      });
   };
   const longPressCell = (key: string): void => {
     if (selection.active) selection.toggle(key);
@@ -46,6 +52,7 @@ export default function FolderScreen() {
                   <Button
                     variant="header"
                     icon="x"
+                    headerLeading
                     accessibilityLabel="Close selection"
                     onPress={selection.exit}
                   />

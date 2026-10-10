@@ -185,6 +185,8 @@ FileHarbor/
 │  │  ├─ useFolderList.ts
 │  │  ├─ useFolderContents.ts
 │  │  ├─ useSelection.ts       gallery 08 and transfers 14
+│  │  ├─ useViewer.ts          09/10 pages, filmstrip, open-file download
+│  │  ├─ useVideoPlayback.ts   10 player, play times, seek
 │  │  ├─ useDownloads.ts       also gives the Downloads badge count
 │  │  ├─ useUploadQueue.ts
 │  │  └─ useMediaPermissions.ts

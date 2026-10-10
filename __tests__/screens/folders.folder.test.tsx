@@ -5,7 +5,7 @@ import FolderScreen from "@/app/(tabs)/folders/[folderId]";
 import { loadFolderFiles, loadThumbnail, syncIndex } from "@/index/sync";
 import type { FolderFile } from "@/types/domain";
 
-import { mockParams, mockStack, resetAuthMocks } from "./authMocks";
+import { mockParams, mockRouter, mockStack, resetAuthMocks } from "./authMocks";
 
 jest.mock("expo-router", () => require("./authMocks").expoRouterModule);
 jest.mock("@/index/sync", () => ({
@@ -69,6 +69,33 @@ describe("Folder 07 — grid", () => {
     expect(screen.getByLabelText("Video, clip.mp4")).toBeOnTheScreen();
     // A document with no image shows its name.
     expect(screen.getByText("notes.pdf")).toBeOnTheScreen();
+  });
+});
+
+describe("Folder 07 — open a file", () => {
+  it("opens a photo or a video in the viewer", async () => {
+    await render(<FolderScreen />);
+    await fireEvent.press(await screen.findByLabelText("Video, clip.mp4"));
+    expect(mockRouter.push).toHaveBeenCalledWith({
+      pathname: "/viewer/[folderId]/[messageId]",
+      params: { folderId: "Goa 2024/Beach", messageId: "2" },
+    });
+  });
+
+  it("does not open the viewer for another file (sheet 11 comes in 7.11)", async () => {
+    await render(<FolderScreen />);
+    await fireEvent.press(await screen.findByLabelText("File, notes.pdf"));
+    expect(mockRouter.push).not.toHaveBeenCalled();
+  });
+
+  it("selects, and does not open, a file during the selection", async () => {
+    await render(<FolderScreen />);
+    await fireEvent(
+      await screen.findByLabelText("Photo, IMG_3.jpg"),
+      "longPress",
+    );
+    await fireEvent.press(screen.getByLabelText("Video, clip.mp4"));
+    expect(mockRouter.push).not.toHaveBeenCalled();
   });
 });
 

@@ -2,14 +2,22 @@ import { parseCaption } from "@/format/caption";
 import { getFilesInDir, replaceDirIndex } from "@/index/db";
 import { minithumbnailUri } from "@/media/minithumbnail";
 import { toServiceError } from "@/telegram/auth";
-import { downloadFile } from "@/telegram/download";
+import {
+  cancelDownload,
+  downloadFile,
+  getFile,
+  onFileUpdate,
+  startPriorityDownload,
+} from "@/telegram/download";
 import { getSavedMessagesChatId } from "@/telegram/savedMessages";
 import { getFullHistory, getMessages } from "@/telegram/search";
 import type { TdFile, TdMessage, TdMessageDocument } from "@/telegram/types";
 import type {
+  FileProgress,
   FolderFile,
   IndexedFile,
   MediaKind,
+  ServiceError,
   ServiceResult,
   SyncReport,
   SyncSkip,
@@ -211,4 +219,56 @@ export async function loadThumbnail(
   return uri
     ? { ok: true, value: uri }
     : { ok: false, error: { kind: "failed", code: "NO_LOCAL_PATH" } };
+}
+
+function toProgress(file: TdFile): FileProgress {
+  return {
+    downloaded: file.local?.downloaded_size ?? 0,
+    size: file.size || file.expected_size || 0,
+    localUri: completedUri(file),
+  };
+}
+
+/**
+ * Downloads one file for the viewer (09, 10) at the highest priority (spec §4.3), and reports
+ * its progress. The result of the start call does not get to JS (TaskList 5.0), so the
+ * progress comes from updateFile. Call the returned function when the file is not on screen:
+ * it stops the reports and cancels a download that this call started. The parts on the
+ * device stay, so the next open continues from them.
+ */
+export function viewFile(
+  fileId: number,
+  onChange: (progress: FileProgress) => void,
+  onError: (error: ServiceError) => void,
+): () => void {
+  let stopped = false;
+  let started = false;
+  let complete = false;
+  const report = (file: TdFile): void => {
+    const progress = toProgress(file);
+    complete = progress.localUri !== null;
+    if (!stopped) onChange(progress);
+  };
+  const unsubscribe = onFileUpdate((file) => {
+    if (file.id === fileId) report(file);
+  });
+
+  void getFile(fileId).then(async (res) => {
+    if (stopped) return;
+    if (!res.ok) {
+      onError(toServiceError(res.error));
+      return;
+    }
+    report(res.value);
+    if (complete) return;
+    started = true;
+    const start = await startPriorityDownload(fileId);
+    if (!start.ok && !stopped) onError(toServiceError(start.error));
+  });
+
+  return () => {
+    stopped = true;
+    unsubscribe();
+    if (started && !complete) void cancelDownload(fileId);
+  };
 }

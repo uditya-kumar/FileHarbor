@@ -76,7 +76,9 @@ export function PhotoViewer({
       setImageDimensions,
     }: RenderItemInfo<ViewerPage>): ReactElement => {
       if (item.kind === "video" && i === index && video) {
-        return <View style={styles.page}>{video}</View>;
+        // Not `page`: its centring gives the slot only the width of its play button, so the
+        // video showed very small, and at zero width when the button hid (device test, 7.10).
+        return <View style={styles.slot}>{video}</View>;
       }
       if (!item.imageUri && !item.placeholderUri) {
         return (
@@ -134,4 +136,5 @@ export function PhotoViewer({
 
 const styles = StyleSheet.create({
   page: { flex: 1, alignItems: "center", justifyContent: "center" },
+  slot: { flex: 1 },
 });

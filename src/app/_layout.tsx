@@ -2,6 +2,8 @@ import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { StrictMode, useEffect } from "react";
+import { LogBox } from "react-native";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 import "react-native-reanimated";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
@@ -18,6 +20,10 @@ export const unstable_settings = {
 const SPLASH_MAX_MS = 4000;
 
 SplashScreen.preventAutoHideAsync();
+
+// gesture-handler 2.32 calls findNodeHandle in GestureDetector, and StrictMode warns about it on
+// each viewer page (09, 10). It is a dev-only warning from the library, not from app code.
+LogBox.ignoreLogs(["findNodeHandle is deprecated in StrictMode"]);
 
 export default function RootLayout() {
   return (
@@ -61,24 +67,46 @@ function RootLayoutNav() {
   };
 
   return (
-    <SafeAreaProvider>
-      <ThemeProvider value={theme}>
-        <StatusBar style="auto" />
-        <Stack
-          screenOptions={{
-            headerTintColor: colors.textPrimary,
-            headerStyle: { backgroundColor: colors.bg },
-          }}
-        >
-          <Stack.Screen name="index" options={{ headerShown: false }} />
-          <Stack.Protected guard={!signedIn}>
-            <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-          </Stack.Protected>
-          <Stack.Protected guard={signedIn}>
-            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          </Stack.Protected>
-        </Stack>
-      </ThemeProvider>
-    </SafeAreaProvider>
+    // The gallery gestures (09, 10) need this root. Without it, they do not work on Android.
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaProvider>
+        <ThemeProvider value={theme}>
+          <StatusBar style="auto" />
+          <Stack
+            screenOptions={{
+              headerTintColor: colors.textPrimary,
+              headerStyle: { backgroundColor: colors.bg },
+            }}
+          >
+            <Stack.Screen name="index" options={{ headerShown: false }} />
+            <Stack.Protected guard={!signedIn}>
+              <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+            </Stack.Protected>
+            <Stack.Protected guard={signedIn}>
+              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+              {/* 09, 10: over the tabs. The header lies over the photo; the screen hides it on
+                a tap. */}
+              <Stack.Screen
+                name="viewer/[folderId]/[messageId]/index"
+                options={{
+                  headerTransparent: true,
+                  headerShadowVisible: false,
+                  headerStyle: { backgroundColor: colors.viewerBg },
+                  headerTintColor: colors.viewerText,
+                  headerTitleAlign: "center",
+                  headerTitleStyle: {
+                    color: colors.viewerTextSecondary,
+                    fontSize: 13,
+                    fontWeight: "500",
+                  },
+                  contentStyle: { backgroundColor: colors.viewerBg },
+                  animation: "fade",
+                }}
+              />
+            </Stack.Protected>
+          </Stack>
+        </ThemeProvider>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }
