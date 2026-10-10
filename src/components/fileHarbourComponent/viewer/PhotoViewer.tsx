@@ -32,7 +32,7 @@ type Props = {
   onIndexChange: (index: number) => void;
   /** The screen's VideoViewer. It shows only on the open page, if that page is a video. */
   video?: ReactNode;
-  /** A tap on the page: the screen shows or hides the bars. */
+  /** A tap on a photo page: the screen shows or hides the bars. Not on a video page. */
   onTap?: () => void;
   onSwipeToClose?: () => void;
 };
@@ -127,7 +127,9 @@ export function PhotoViewer({
       // A zoom gesture on a video page would fight the play button and the scrubber.
       pinchEnabled={!openIsVideo}
       doubleTapEnabled={!openIsVideo}
-      onTap={onTap}
+      // A video page takes its own taps (VideoViewer `onPressPage`). With both, a tap on Play
+      // also hid the bars (device test, 7.10).
+      onTap={openIsVideo ? undefined : onTap}
       onSwipeToClose={onSwipeToClose}
       style={{ backgroundColor: colors.viewerBg }}
     />

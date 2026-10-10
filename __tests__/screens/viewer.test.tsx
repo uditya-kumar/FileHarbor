@@ -1,4 +1,9 @@
 import { act, fireEvent, render, screen } from "@testing-library/react-native";
+import { State } from "react-native-gesture-handler";
+import {
+  fireGestureHandler,
+  getByGestureTestId,
+} from "react-native-gesture-handler/jest-utils";
 import type { ReactElement, Ref } from "react";
 
 import ViewerScreen from "@/app/viewer/[folderId]/[messageId]";
@@ -243,6 +248,21 @@ describe("Viewer 10 — video", () => {
     expect(screen.getByLabelText("Play position")).toBeOnTheScreen();
     expect(screen.getAllByText("0:00")).toHaveLength(2);
     expect(screen.getByRole("button", { name: "Play" })).toBeOnTheScreen();
+  });
+
+  it("hides the bars on a tap on the video page", async () => {
+    await render(<ViewerScreen />);
+    await screen.findByText("Downloading · from Telegram");
+    expect(gallery().onTap).toBeUndefined();
+    await act(() =>
+      fireGestureHandler(getByGestureTestId("video-page-tap"), [
+        { state: State.BEGAN },
+        { state: State.ACTIVE },
+        { state: State.END },
+      ]),
+    );
+    expect(mockStack.options.headerShown).toBe(false);
+    expect(screen.queryByLabelText("Play position")).toBeNull();
   });
 
   it("hides the download line when the whole video is on the device", async () => {

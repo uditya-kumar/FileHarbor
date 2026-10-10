@@ -350,13 +350,21 @@ needs them.
           slot was only as wide as its play button. When the button hid, the width was 0.
         - The fix: the slot fills the page. A component test checks it. (A first guess, the
           TextureView, was wrong. The TextureView stays.)
+        - A tap on Play also hid the bars: the button and the pager tap both got it. Now a
+          video page takes its own taps. The pager tap is off on a video page. A
+          gesture-handler tap is on a layer under the button (a Pressable gets no press over
+          the VideoView). gesture-handler stops at the button, so Play only plays.
+        - 📱 Device test 2 (adb and the user): full size, Play keeps the bars, a page tap
+          hides and shows them. ✅
+      - `jest.setup.ts` loads `react-native-gesture-handler/jestSetup`, so a test can fire a
+        gesture (`fireGestureHandler`).
       - The root layout has a `GestureHandlerRootView`. Before it, the gallery gestures did not
         work on Android. LogBox hides one dev-only warning: gesture-handler 2.32 calls
         `findNodeHandle` in StrictMode.
       - 📱 Do on a device:
         - the gallery swipe, pinch, and double-tap check (spec §12.4);
         - a HEIC photo;
-        - a video: full size, a tap while it plays, and it moves with a swipe;
+        - a video moves with a swipe;
         - the SHA-256 of the 51.8 MB video (build step 4);
         - compare 09 and 10 with `Design.pen`.
       - For task 7.12: `useDownloads` must not cancel a download that the Downloads tab started.

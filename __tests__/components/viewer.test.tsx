@@ -2,6 +2,11 @@ import { fireEvent, render, screen } from "@testing-library/react-native";
 import type { ReactElement, Ref } from "react";
 import { Text } from "react-native";
 import type { VideoPlayer } from "expo-video";
+import { State } from "react-native-gesture-handler";
+import {
+  fireGestureHandler,
+  getByGestureTestId,
+} from "react-native-gesture-handler/jest-utils";
 
 import {
   PhotoViewer,
@@ -38,6 +43,7 @@ type GalleryProps = {
   }) => ReactElement | null;
   initialIndex?: number;
   onIndexChange?: (i: number) => void;
+  onTap?: () => void;
   pinchEnabled?: boolean;
   doubleTapEnabled?: boolean;
 };
@@ -213,6 +219,28 @@ describe("PhotoViewer", () => {
     expect(lastGallery().doubleTapEnabled).toBe(false);
   });
 
+  it("gives the pager tap to a photo page only: a video page takes its own taps", async () => {
+    const onTap = jest.fn();
+    const { rerender } = await render(
+      <PhotoViewer
+        pages={pages}
+        index={0}
+        onIndexChange={jest.fn()}
+        onTap={onTap}
+      />,
+    );
+    expect(lastGallery().onTap).toBe(onTap);
+    await rerender(
+      <PhotoViewer
+        pages={pages}
+        index={1}
+        onIndexChange={jest.fn()}
+        onTap={onTap}
+      />,
+    );
+    expect(lastGallery().onTap).toBeUndefined();
+  });
+
   it("moves the pager for a new index from the screen, not for a swipe", async () => {
     const onIndexChange = jest.fn();
     const { rerender } = await render(
@@ -251,6 +279,31 @@ describe("VideoViewer", () => {
     expect(mockVideoView.mock.calls[0][0].surfaceType).toBe("textureView");
     await fireEvent.press(screen.getByRole("button", { name: "Play" }));
     expect(onTogglePlay).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows or hides the bars on a page tap, and not on a tap on Play", async () => {
+    const onTogglePlay = jest.fn();
+    const onPressPage = jest.fn();
+    await render(
+      <VideoViewer
+        player={player}
+        posterUri={null}
+        recyclingKey="2"
+        playing
+        onTogglePlay={onTogglePlay}
+        onPressPage={onPressPage}
+      />,
+    );
+    fireGestureHandler(getByGestureTestId("video-page-tap"), [
+      { state: State.BEGAN },
+      { state: State.ACTIVE },
+      { state: State.END },
+    ]);
+    expect(onPressPage).toHaveBeenCalledTimes(1);
+    expect(onTogglePlay).not.toHaveBeenCalled();
+    await fireEvent.press(screen.getByRole("button", { name: "Pause" }));
+    expect(onTogglePlay).toHaveBeenCalledTimes(1);
+    expect(onPressPage).toHaveBeenCalledTimes(1);
   });
 
   it("shows the poster only while there is no player", async () => {

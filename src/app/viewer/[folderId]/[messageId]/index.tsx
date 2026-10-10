@@ -70,6 +70,7 @@ export default function ViewerScreen() {
                 recyclingKey={open.key}
                 playing={video.playing}
                 onTogglePlay={video.toggle}
+                onPressPage={viewer.toggleChrome}
                 controlsVisible={chrome}
               />
             ) : null
