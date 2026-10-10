@@ -211,17 +211,36 @@ needs them.
       or ask for drawables and a config plugin that copies them into `android/app/src/main/res`.
       Open: the Downloads `Badge` waits for `useDownloads` (task 7.12). Compare the tab bar with
       the `Chrome / …` frames.
-- [ ] 6.2 Write `folders/_layout.tsx`, `transfers/_layout.tsx`, `settings/_layout.tsx` (Stack only).
-      Status: the three Stack layouts exist. `transfers/index.tsx` redirects to
-      `./downloads`. The screens under them are placeholders: `folders/index.tsx` (task 6.5),
-      `transfers/downloads/index.tsx` (task 7.14), `transfers/uploads/index.tsx` (task 9.6), and
-      `settings/index.tsx` (task 11.4). The native header shows the title. Each screen shows
-      only "Not built yet". The `headerRight` buttons come with the screens.
-- [ ] 6.3 Write `shared/ListRow.tsx` and `shared/SectionHeader.tsx`.
-- [ ] 6.4 Write `src/hooks/useFolderList.ts`.
+- [x] 6.2 Write `folders/_layout.tsx`, `transfers/_layout.tsx`, `settings/_layout.tsx` (Stack only).
+      Done. `transfers/index.tsx` redirects to `./downloads`. The Downloads, Uploads, and
+      Settings screens are placeholders until tasks 7.14, 9.6, and 11.4.
+- [x] 6.3 Write `shared/ListRow.tsx` and `shared/SectionHeader.tsx`.
+      Done. Also added to `shared/`: `RowList` (FlashList of card rows, for 04 and 12–14),
+      `ButtonRow` (equal-width buttons, 06), and `SheetGrabber` (Android only). New props:
+      `Button` variant `header`, `TitleBlock` `align`/`action`, `Screen` `background`/`fit`,
+      `InputField` `hintIcon`/`autoCapitalize`/`maxLength`, `FormBody` `dense`.
+      `ListRow` has `trailing` "chevron" | "none" only. Add the other kinds with their screens.
+- [x] 6.4 Write `src/hooks/useFolderList.ts`.
+      Done. It shows the cache first, then reads all captions again (spec §5). It reads the
+      cache again on each focus (after sheet 06). `FLOOD_WAIT` shows as `warn`, not `danger`.
+      Database migration 2 adds `size` and `mime_type` to `dir_index`, and the `local_dir` table.
 - [ ] 6.5 Write screen 04 and 05 `folders/index.tsx` (list and empty). Do the screen checks.
-- [ ] 6.6 Write screen 06 `folders/new/index.tsx` (form sheet, local `dir_index` row only).
-      Add `shared/SheetGrabber.tsx`. Do the screen checks.
+      Status: the screen and the tests are done (loaded, empty, loading, error, rate-limited,
+      search). tsc, lint, and the audits pass.
+      Difference from frame 04: the search is the native `Stack.SearchBar`, not a field in the
+      content (Rules §3).
+      Difference from frame 05: the circle is `bgSunken`, because `bgMuted` does not show on
+      the `bgMuted` page.
+      Files in the root folder are not listed. The rows do not open yet (task 7.6).
+      Open: 👤 compare with frames 04 and 05 in light and dark (`native-sim` needs approval,
+      or use a device).
+- [ ] 6.6 Write screen 06 `folders/new/index.tsx` (form sheet).
+      Status: the screen and the tests are done. tsc, lint, and the audits pass.
+      A new empty folder is a `local_dir` row on this device only. Telegram has no record of it
+      until its first upload, because the caption is the only record of the folder tree. A sync
+      deletes the row when the folder has files. Log-out clears it (task 11.4).
+      Open: on a device, check `fitToContents` with the keyboard open, and the grabber on
+      Android. 👤 Compare with frame 06 in light and dark.
 
 ## Phase 7 — Read path (spec §11 step 4)
 

@@ -15,7 +15,8 @@ export type ServiceError = {
   retryAfter?: number;
 };
 
-export type ServiceResult<T> = { ok: true; value: T } | { ok: false; error: ServiceError };
+export type ServiceResult<T> =
+  { ok: true; value: T } | { ok: false; error: ServiceError };
 
 export type CodeDelivery = "telegram" | "sms" | "call" | "other";
 
@@ -49,10 +50,32 @@ export type IndexedFile = {
   name: string;
   /** Unix seconds. */
   date: number;
+  /** Bytes. 0 when Telegram does not give the size. */
+  size: number;
+  /** From Telegram, e.g. "image/jpeg". "" when unknown. */
+  mimeType: string;
 };
 
-/** One folder path in dir_index and its file count. */
-export type DirSummary = { dirPath: string; fileCount: number };
+/** One folder path in dir_index: the files directly in it. */
+export type DirSummary = {
+  dirPath: string;
+  fileCount: number;
+  totalSize: number;
+  /** Files with an image or video MIME type. */
+  mediaCount: number;
+};
+
+/**
+ * One folder in a list (04): its counts cover all the folders inside it. A folder with no file
+ * is on this device only, until its first upload writes its name into a caption (spec §1).
+ */
+export type FolderSummary = {
+  dirPath: string;
+  name: string;
+  fileCount: number;
+  totalSize: number;
+  mediaCount: number;
+};
 
 /** A FileHarbor caption that the sync did not index. The sync report shows it (TaskList 5.7). */
 export type SyncSkip = {

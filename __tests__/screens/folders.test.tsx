@@ -1,112 +1,188 @@
-import { fireEvent, render, screen } from "@testing-library/react-native";
+import { act, fireEvent, render, screen } from "@testing-library/react-native";
 
 import FoldersScreen from "@/app/(tabs)/folders";
-import { getDirSummaries } from "@/index/db";
+import { getChildFolders } from "@/index/db";
 import { syncIndex } from "@/index/sync";
+import type { FolderSummary } from "@/types/domain";
 
+import { mockRouter, mockStack, resetAuthMocks } from "./authMocks";
+
+jest.mock("expo-router", () => require("./authMocks").expoRouterModule);
 jest.mock("@/index/sync", () => ({ syncIndex: jest.fn() }));
-jest.mock("@/index/db", () => ({ getDirSummaries: jest.fn() }));
+jest.mock("@/index/db", () => ({ getChildFolders: jest.fn() }));
 
 const sync = syncIndex as jest.Mock;
-const dirs = getDirSummaries as jest.Mock;
+const folders = getChildFolders as jest.Mock;
+
+const GB = 1024 ** 3;
+const MB = 1024 ** 2;
+const goa: FolderSummary = {
+  dirPath: "Goa 2024",
+  name: "Goa 2024",
+  fileCount: 148,
+  totalSize: 2.4 * GB,
+  mediaCount: 140,
+};
+const docs: FolderSummary = {
+  dirPath: "Work Docs",
+  name: "Work Docs",
+  fileCount: 1,
+  totalSize: 300 * MB,
+  mediaCount: 0,
+};
+const trip: FolderSummary = {
+  dirPath: "Trip",
+  name: "Trip",
+  fileCount: 0,
+  totalSize: 0,
+  mediaCount: 0,
+};
 
 const report = {
-  scanned: 612,
-  indexed: 600,
-  other: 10,
-  skipped: [
-    { messageId: 41, caption: "fileharbor:1:{", reason: "bad_caption" },
-    {
-      messageId: 42,
-      caption: 'fileharbor:1:{"path":[],"name":"a"}',
-      reason: "not_document",
-    },
-  ],
+  ok: true,
+  value: { scanned: 3, indexed: 3, other: 0, skipped: [] },
 };
 
 beforeEach(() => {
-  sync.mockReset().mockResolvedValue({ ok: true, value: report });
-  dirs.mockReset().mockResolvedValue({
-    ok: true,
-    value: [
-      { dirPath: "", fileCount: 1 },
-      { dirPath: "Holiday/Beach", fileCount: 599 },
-    ],
-  });
+  resetAuthMocks();
+  sync.mockReset().mockResolvedValue(report);
+  folders.mockReset().mockResolvedValue({ ok: true, value: [goa, docs, trip] });
 });
 
-describe("Folders — temporary sync report (5.7)", () => {
-  it("shows the counts, each folder path, and each skipped caption", async () => {
+describe("Folders 04 — list", () => {
+  it("shows each folder with its count and size, and the summary", async () => {
     await render(<FoldersScreen />);
-    expect(await screen.findByText("Sync report")).toBeOnTheScreen();
-    expect(
-      screen.getByText("612 messages · 600 files · 10 other · 2 skipped"),
-    ).toBeOnTheScreen();
-    expect(screen.getByText("/ · 1 file")).toBeOnTheScreen();
-    expect(screen.getByText("/Holiday/Beach · 599 files")).toBeOnTheScreen();
-    expect(
-      screen.getByText('Message 41 · caption does not parse: "fileharbor:1:{"'),
-    ).toBeOnTheScreen();
-    expect(
-      screen.getByText(
-        'Message 42 · not a document: "fileharbor:1:{\\"path\\":[],\\"name\\":\\"a\\"}"',
-      ),
-    ).toBeOnTheScreen();
+    expect(await screen.findByText("3 Folders · 2.7 GB")).toBeOnTheScreen();
+    expect(screen.getByText("Goa 2024")).toBeOnTheScreen();
+    expect(screen.getByText("148 items · 2.4 GB")).toBeOnTheScreen();
+    expect(screen.getByText("1 item · 300 MB")).toBeOnTheScreen();
+    expect(screen.getByText("No files yet")).toBeOnTheScreen();
+    expect(folders).toHaveBeenCalledWith("");
   });
 
-  it("shows the progress while it reads", async () => {
-    sync.mockImplementation((onProgress: (n: number) => void) => {
-      onProgress(200);
-      return new Promise(() => undefined);
-    });
+  it("shows the cache first, then syncs and reads the cache again", async () => {
+    let finish: (v: typeof report) => void = () => {};
+    sync.mockReturnValue(new Promise((resolve) => (finish = resolve)));
+    // The first focus reads the cache. The sync then reads it again.
+    folders.mockResolvedValueOnce({ ok: true, value: [goa] });
     await render(<FoldersScreen />);
-    expect(screen.getByText("Reading Saved Messages")).toBeOnTheScreen();
-    expect(screen.getByText("200 messages read")).toBeOnTheScreen();
+    expect(await screen.findByText("1 Folder · 2.4 GB")).toBeOnTheScreen();
+    await act(async () => finish(report));
+    expect(await screen.findByText("3 Folders · 2.7 GB")).toBeOnTheScreen();
   });
 
-  it("shows the empty state", async () => {
-    sync.mockResolvedValue({
-      ok: true,
-      value: { scanned: 3, indexed: 0, other: 3, skipped: [] },
-    });
-    dirs.mockResolvedValue({ ok: true, value: [] });
+  it("opens the new folder sheet from the header", async () => {
     await render(<FoldersScreen />);
-    expect(
-      await screen.findByText("No file has a FileHarbor caption."),
-    ).toBeOnTheScreen();
+    await screen.findByText("Goa 2024");
+    const HeaderRight = mockStack.options.headerRight;
+    expect(HeaderRight).toBeDefined();
+    await render(<>{HeaderRight?.()}</>);
+    await fireEvent.press(screen.getByRole("button", { name: "New folder" }));
+    expect(mockRouter.push).toHaveBeenCalledWith("/folders/new");
   });
 
-  it("shows a flood wait as a warning, not an error", async () => {
+  it("filters by name from the header search", async () => {
+    await render(<FoldersScreen />);
+    await screen.findByText("Goa 2024");
+    expect(mockStack.searchBar?.placeholder).toBe("Search folders by name");
+    await act(async () =>
+      mockStack.searchBar?.onChangeText?.({ nativeEvent: { text: " work" } }),
+    );
+    expect(screen.getByText("1 Folder · 300 MB")).toBeOnTheScreen();
+    expect(screen.queryByText("Goa 2024")).not.toBeOnTheScreen();
+    await act(async () =>
+      mockStack.searchBar?.onChangeText?.({ nativeEvent: { text: "zzz" } }),
+    );
+    expect(screen.getByText('No folder name has "zzz".')).toBeOnTheScreen();
+  });
+
+  it("keeps the list and shows a warn banner when Telegram rate-limits", async () => {
     sync.mockResolvedValue({
       ok: false,
-      error: { kind: "rate_limited", code: "FLOOD_WAIT_30", retryAfter: 30 },
+      error: { kind: "rate_limited", code: "FLOOD_WAIT", retryAfter: 30 },
     });
     await render(<FoldersScreen />);
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      "Telegram is rate-limiting. Try again in 30 s.",
-    );
-    expect(dirs).not.toHaveBeenCalled();
+    expect(
+      await screen.findByText(
+        "Telegram asks the app to wait 30 s. Then try again.",
+      ),
+    ).toBeOnTheScreen();
+    expect(screen.getByText("Goa 2024")).toBeOnTheScreen();
   });
 
-  it("shows an error, and syncs again on the button", async () => {
-    sync.mockResolvedValueOnce({
+  it("keeps the list and shows an error banner when the sync fails", async () => {
+    sync.mockResolvedValue({
       ok: false,
       error: { kind: "failed", code: "CHAT_NOT_FOUND" },
     });
     await render(<FoldersScreen />);
     expect(
-      await screen.findByText("The sync did not complete: CHAT_NOT_FOUND"),
+      await screen.findByText("The folders did not update (CHAT_NOT_FOUND)."),
     ).toBeOnTheScreen();
-    await fireEvent.press(screen.getByRole("button", { name: "Sync again" }));
-    expect(await screen.findByText("Sync report")).toBeOnTheScreen();
+    expect(screen.getByRole("alert")).toBeOnTheScreen();
+  });
+});
+
+describe("Folders 05 — empty, loading, and error", () => {
+  beforeEach(() => folders.mockResolvedValue({ ok: true, value: [] }));
+
+  it("shows the empty state and opens the sheet", async () => {
+    await render(<FoldersScreen />);
+    expect(await screen.findByText("No folders yet")).toBeOnTheScreen();
+    expect(
+      screen.getByText(
+        "Create a folder, then upload photos and videos into it.",
+      ),
+    ).toBeOnTheScreen();
+    expect(mockStack.searchBar).toBeNull();
+    await fireEvent.press(screen.getByRole("button", { name: "New folder" }));
+    expect(mockRouter.push).toHaveBeenCalledWith("/folders/new");
+  });
+
+  it("shows the progress of the first sync", async () => {
+    sync.mockImplementation((onProgress: (n: number) => void) => {
+      onProgress(200);
+      return new Promise(() => {});
+    });
+    await render(<FoldersScreen />);
+    expect(await screen.findByText("Reading Saved Messages")).toBeOnTheScreen();
+    expect(screen.getByText("200 messages read")).toBeOnTheScreen();
+  });
+
+  it("shows an error when the first sync fails, and tries again", async () => {
+    sync.mockResolvedValueOnce({
+      ok: false,
+      error: { kind: "unavailable", code: "not_ready" },
+    });
+    await render(<FoldersScreen />);
+    expect(
+      await screen.findByText("The folders did not load"),
+    ).toBeOnTheScreen();
+    expect(screen.getByText("Telegram is not connected.")).toBeOnTheScreen();
+    await fireEvent.press(screen.getByRole("button", { name: "Try again" }));
+    expect(await screen.findByText("No folders yet")).toBeOnTheScreen();
     expect(sync).toHaveBeenCalledTimes(2);
   });
 
-  it("shows a database error", async () => {
-    dirs.mockResolvedValue({ ok: false, message: "disk I/O error" });
+  it("shows the rate limit without red when the first sync is rate-limited", async () => {
+    sync.mockResolvedValue({
+      ok: false,
+      error: { kind: "rate_limited", code: "FLOOD_WAIT", retryAfter: 9 },
+    });
     await render(<FoldersScreen />);
     expect(
-      await screen.findByText("The sync did not complete: disk I/O error"),
+      await screen.findByText("The folders did not load"),
+    ).toBeOnTheScreen();
+    expect(
+      screen.getByText("Telegram asks the app to wait 9 s. Then try again."),
+    ).toBeOnTheScreen();
+  });
+
+  it("shows a database error", async () => {
+    folders.mockResolvedValue({ ok: false, message: "disk I/O error" });
+    await render(<FoldersScreen />);
+    expect(
+      await screen.findByText("The folders did not load (disk I/O error)."),
     ).toBeOnTheScreen();
   });
 });

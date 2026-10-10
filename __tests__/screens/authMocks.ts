@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, type ReactNode } from "react";
 
 import type { AuthStep, ServiceResult } from "@/types/domain";
 
@@ -39,6 +39,15 @@ export const mockRouter = {
   canGoBack: jest.fn(() => false),
 };
 
+/** The last options of <Stack.Screen /> and the last props of <Stack.SearchBar />. */
+export const mockStack: {
+  options: { headerRight?: () => ReactNode };
+  searchBar: {
+    placeholder?: string;
+    onChangeText?: (e: { nativeEvent: { text: string } }) => void;
+  } | null;
+} = { options: {}, searchBar: null };
+
 /** Records the href of each rendered <Redirect />. */
 export const mockRedirect = jest.fn((_href: string): null => null);
 
@@ -47,10 +56,22 @@ export const expoRouterModule = {
   // The screen under test is always focused.
   useFocusEffect: (effect: () => void) => useEffect(effect, [effect]),
   Redirect: ({ href }: { href: string }) => mockRedirect(href),
+  Stack: {
+    Screen: ({ options }: { options: typeof mockStack.options }) => {
+      mockStack.options = options;
+      return null;
+    },
+    SearchBar: (props: NonNullable<typeof mockStack.searchBar>) => {
+      mockStack.searchBar = props;
+      return null;
+    },
+  },
 };
 
 export function resetAuthMocks(): void {
   listeners.clear();
   current = { step: "phone" };
+  mockStack.options = {};
+  mockStack.searchBar = null;
   jest.clearAllMocks();
 }

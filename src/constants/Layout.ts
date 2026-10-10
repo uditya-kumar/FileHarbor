@@ -12,5 +12,18 @@ export const Layout = {
     footerGap: 14,
     footerActionGap: 16,
   },
+  // 04: rows on a muted page, 10 apart; a 40 icon tile in each row.
+  list: { top: 14, gap: 10, rowPad: 14, rowGap: 14, tile: 40, textGap: 3 },
+  // 05: a centred message in the free space.
+  empty: { padX: 40, gap: 16, copyGap: 7, mark: 72 },
+  // 06: form sheet content.
+  sheet: {
+    radius: 18,
+    gap: 17,
+    top: 10,
+    grabberWidth: 38,
+    grabberHeight: 4,
+    actionGap: 10,
+  },
   hairline: 1,
 } as const;

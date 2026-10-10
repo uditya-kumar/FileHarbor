@@ -13,19 +13,35 @@ type Props = {
   footerNote?: string;
   /** Mirror of the Stack option. With no native header, the screen pads the status bar. */
   headerShown?: boolean;
+  /** "muted" for a page of rows (04): the rows are white on it. */
+  background?: "default" | "muted";
+  /**
+   * Size to the content, not the window. Set it on a form sheet with
+   * `sheetAllowedDetents: "fitToContents"`: that sheet cannot use flex 1. The native sheet
+   * moves above the keyboard, so the screen does not avoid the keyboard itself.
+   */
+  fit?: boolean;
 };
 
-export function Screen({ children, footer, footerNote, headerShown = true }: Props) {
+export function Screen({
+  children,
+  footer,
+  footerNote,
+  headerShown = true,
+  background = "default",
+  fit = false,
+}: Props) {
   const { colors } = useColorScheme();
   const insets = useSafeAreaInsets();
   const hasFooter = footer != null;
+  const fill = fit ? null : styles.fill;
 
   return (
     <View
       style={[
-        styles.root,
+        fill,
         {
-          backgroundColor: colors.bg,
+          backgroundColor: background === "muted" ? colors.bgMuted : colors.bg,
           paddingTop: headerShown ? 0 : insets.top,
           paddingLeft: insets.left,
           paddingRight: insets.right,
@@ -33,12 +49,18 @@ export function Screen({ children, footer, footerNote, headerShown = true }: Pro
       ]}
     >
       {/* Edge-to-edge Android does not resize the window for the keyboard. */}
-      <KeyboardAvoidingView style={styles.fill} behavior="padding" enabled={hasFooter}>
-        <View style={styles.fill}>{children}</View>
+      <KeyboardAvoidingView
+        style={fill}
+        behavior="padding"
+        enabled={hasFooter && !fit}
+      >
+        <View style={fill}>{children}</View>
         {hasFooter ? (
           <View
             style={[
               styles.footer,
+              // A fit sheet has no free space above the footer, so it needs its own gap.
+              fit && styles.footerFit,
               {
                 paddingBottom: Math.max(
                   Layout.screen.footerBottom,
@@ -49,7 +71,9 @@ export function Screen({ children, footer, footerNote, headerShown = true }: Pro
           >
             <View style={styles.actions}>{footer}</View>
             {footerNote ? (
-              <Text style={[styles.note, { color: colors.textTertiary }]}>{footerNote}</Text>
+              <Text style={[styles.note, { color: colors.textTertiary }]}>
+                {footerNote}
+              </Text>
             ) : null}
           </View>
         ) : null}
@@ -59,14 +83,18 @@ export function Screen({ children, footer, footerNote, headerShown = true }: Pro
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1 },
   fill: { flex: 1 },
   footer: {
     paddingHorizontal: Layout.pad,
     gap: Layout.screen.footerGap,
     alignItems: "center",
   },
+  footerFit: { paddingTop: Layout.sheet.gap },
   // 03: 16 between stacked actions; 01: 14 between the action and the note.
-  actions: { alignSelf: "stretch", alignItems: "center", gap: Layout.screen.footerActionGap },
+  actions: {
+    alignSelf: "stretch",
+    alignItems: "center",
+    gap: Layout.screen.footerActionGap,
+  },
   note: { fontSize: 12, textAlign: "center" },
 });

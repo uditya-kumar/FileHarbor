@@ -15,7 +15,10 @@ type Props = {
 };
 
 // flood_wait uses "warn", never "danger": red makes users retry (spec §5.2).
-function toneColors(tone: Tone, colors: ColorTokens): { bg: string; fg: string } {
+function toneColors(
+  tone: Tone,
+  colors: ColorTokens,
+): { bg: string; fg: string } {
   switch (tone) {
     case "info":
       return { bg: colors.bgMuted, fg: colors.textSecondary };
@@ -35,7 +38,9 @@ export function Banner({ text, icon, tone = "info" }: Props) {
   return (
     <View
       accessible
-      accessibilityRole={tone === "danger" || tone === "warn" ? "alert" : undefined}
+      accessibilityRole={
+        tone === "danger" || tone === "warn" ? "alert" : undefined
+      }
       style={[styles.banner, { backgroundColor: bg }]}
     >
       <Icon name={icon} size={15} color={fg} />

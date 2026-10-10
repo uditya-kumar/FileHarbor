@@ -12,7 +12,7 @@ import {
 import { Layout } from "@/constants/Layout";
 import { useColorScheme } from "@/hooks/useColorScheme";
 
-import { Icon } from "./Icon";
+import { Icon, type IconName } from "./Icon";
 
 type Props = {
   label: string;
@@ -24,10 +24,15 @@ type Props = {
   /** Hides the text and shows an eye toggle (03). */
   secure?: boolean;
   hint?: string;
+  /** Shown before the hint (06 info note). */
+  hintIcon?: IconName;
   error?: string;
   placeholder?: string;
   keyboardType?: KeyboardTypeOptions;
   autoComplete?: TextInputProps["autoComplete"];
+  /** "none" by default: phone numbers, codes, and passwords. */
+  autoCapitalize?: TextInputProps["autoCapitalize"];
+  maxLength?: number;
   autoFocus?: boolean;
   returnKeyType?: TextInputProps["returnKeyType"];
   onSubmitEditing?: () => void;
@@ -43,10 +48,13 @@ export function InputField({
   onChangePrefix,
   secure = false,
   hint,
+  hintIcon,
   error,
   placeholder,
   keyboardType,
   autoComplete,
+  autoCapitalize = "none",
+  maxLength,
   autoFocus,
   returnKeyType,
   onSubmitEditing,
@@ -57,11 +65,17 @@ export function InputField({
   const [focused, setFocused] = useState(false);
   const [revealed, setRevealed] = useState(false);
   const hidden = secure && !revealed;
-  const borderColor = error ? colors.danger : focused ? colors.accent : colors.borderStrong;
+  const borderColor = error
+    ? colors.danger
+    : focused
+      ? colors.accent
+      : colors.borderStrong;
 
   return (
     <View style={styles.field}>
-      <Text style={[styles.label, { color: colors.textTertiary }]}>{label}</Text>
+      <Text style={[styles.label, { color: colors.textTertiary }]}>
+        {label}
+      </Text>
       <View style={[styles.box, { backgroundColor: colors.bg, borderColor }]}>
         {prefix !== undefined ? (
           <>
@@ -73,9 +87,15 @@ export function InputField({
               accessibilityLabel={`${label} country code`}
               onFocus={() => setFocused(true)}
               onBlur={() => setFocused(false)}
-              style={[styles.input, styles.prefix, { color: colors.textPrimary }]}
+              style={[
+                styles.input,
+                styles.prefix,
+                { color: colors.textPrimary },
+              ]}
             />
-            <View style={[styles.divider, { backgroundColor: colors.borderStrong }]} />
+            <View
+              style={[styles.divider, { backgroundColor: colors.borderStrong }]}
+            />
           </>
         ) : null}
         <TextInput
@@ -86,7 +106,8 @@ export function InputField({
           placeholderTextColor={colors.textTertiary}
           keyboardType={keyboardType}
           autoComplete={autoComplete}
-          autoCapitalize="none"
+          autoCapitalize={autoCapitalize}
+          maxLength={maxLength}
           autoCorrect={false}
           autoFocus={autoFocus}
           returnKeyType={returnKeyType}
@@ -108,14 +129,31 @@ export function InputField({
             accessibilityRole="button"
             accessibilityLabel={revealed ? hideLabel : showLabel}
           >
-            <Icon name={revealed ? "eye-off" : "eye"} size={18} color={colors.textTertiary} />
+            <Icon
+              name={revealed ? "eye-off" : "eye"}
+              size={18}
+              color={colors.textTertiary}
+            />
           </Pressable>
         ) : null}
       </View>
       {error ? (
         <Text style={[styles.hint, { color: colors.danger }]}>{error}</Text>
       ) : hint ? (
-        <Text style={[styles.hint, { color: colors.textTertiary }]}>{hint}</Text>
+        <View style={styles.hintRow}>
+          {hintIcon ? (
+            <Icon name={hintIcon} size={14} color={colors.textTertiary} />
+          ) : null}
+          <Text
+            style={[
+              styles.hint,
+              hintIcon && styles.hintWithIcon,
+              { color: colors.textTertiary },
+            ]}
+          >
+            {hint}
+          </Text>
+        </View>
       ) : null}
     </View>
   );
@@ -139,4 +177,7 @@ const styles = StyleSheet.create({
   dots: { fontSize: 17, fontWeight: "600" },
   divider: { width: Layout.hairline, height: 22 },
   hint: { fontSize: 12 },
+  hintRow: { flexDirection: "row", alignItems: "flex-start", gap: 6 },
+  // 06: the info note is smaller than a plain hint.
+  hintWithIcon: { flex: 1, fontSize: 11, lineHeight: 15 },
 });

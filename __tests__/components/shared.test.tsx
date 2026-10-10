@@ -1,9 +1,16 @@
 import { fireEvent, render, screen } from "@testing-library/react-native";
 
+import { Platform } from "react-native";
+
 import { Banner } from "@components/fileHarbourComponent/shared/Banner";
 import { Button } from "@components/fileHarbourComponent/shared/Button";
+import { ButtonRow } from "@components/fileHarbourComponent/shared/ButtonRow";
 import { InputField } from "@components/fileHarbourComponent/shared/InputField";
+import { ListRow } from "@components/fileHarbourComponent/shared/ListRow";
+import { RowList } from "@components/fileHarbourComponent/shared/RowList";
 import { Screen } from "@components/fileHarbourComponent/shared/Screen";
+import { SectionHeader } from "@components/fileHarbourComponent/shared/SectionHeader";
+import { SheetGrabber } from "@components/fileHarbourComponent/shared/SheetGrabber";
 import { TitleBlock } from "@components/fileHarbourComponent/shared/TitleBlock";
 
 describe("Button", () => {
@@ -16,7 +23,9 @@ describe("Button", () => {
 
   it("does not call onPress when disabled or loading", async () => {
     const onPress = jest.fn();
-    const { rerender } = await render(<Button label="Continue" onPress={onPress} disabled />);
+    const { rerender } = await render(
+      <Button label="Continue" onPress={onPress} disabled />,
+    );
     await fireEvent.press(screen.getByRole("button"));
     await rerender(<Button label="Continue" onPress={onPress} loading />);
     await fireEvent.press(screen.getByRole("button"));
@@ -29,15 +38,119 @@ describe("Button", () => {
   });
 
   it("uses accessibilityLabel for an icon-only button", async () => {
-    await render(<Button icon="log-out" accessibilityLabel="Log out" onPress={jest.fn()} />);
+    await render(
+      <Button
+        icon="log-out"
+        accessibilityLabel="Log out"
+        onPress={jest.fn()}
+      />,
+    );
     expect(screen.getByRole("button", { name: "Log out" })).toBeOnTheScreen();
+  });
+
+  it("renders the header variant as an icon button", async () => {
+    const onPress = jest.fn();
+    await render(
+      <Button
+        variant="header"
+        icon="circle-plus"
+        accessibilityLabel="New folder"
+        onPress={onPress}
+      />,
+    );
+    await fireEvent.press(screen.getByRole("button", { name: "New folder" }));
+    expect(onPress).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("ButtonRow", () => {
+  it("renders each button", async () => {
+    await render(
+      <ButtonRow>
+        <Button
+          label="Cancel"
+          variant="secondary"
+          fullWidth
+          onPress={jest.fn()}
+        />
+        <Button label="Create" fullWidth onPress={jest.fn()} />
+      </ButtonRow>,
+    );
+    expect(screen.getAllByRole("button")).toHaveLength(2);
+  });
+});
+
+describe("ListRow", () => {
+  it("renders the title and the subtitle, and calls onPress", async () => {
+    const onPress = jest.fn();
+    await render(
+      <ListRow
+        icon="folder"
+        title="Goa 2024"
+        subtitle="148 items · 2.4 GB"
+        trailing="chevron"
+        onPress={onPress}
+      />,
+    );
+    expect(screen.getByText("148 items · 2.4 GB")).toBeOnTheScreen();
+    await fireEvent.press(
+      screen.getByRole("button", { name: "Goa 2024, 148 items · 2.4 GB" }),
+    );
+    expect(onPress).toHaveBeenCalledTimes(1);
+  });
+
+  it("is not a button without onPress", async () => {
+    await render(<ListRow title="Goa 2024" />);
+    expect(screen.queryByRole("button")).not.toBeOnTheScreen();
+  });
+});
+
+describe("RowList", () => {
+  it("renders the header and a row for each item", async () => {
+    await render(
+      <RowList
+        data={["A", "B"]}
+        keyExtractor={(x) => x}
+        header={<SectionHeader title="2 Folders · 0 B" />}
+        renderItem={({ item }) => <ListRow title={item} />}
+      />,
+    );
+    expect(screen.getByText("2 Folders · 0 B")).toBeOnTheScreen();
+    expect(screen.getByText("A")).toBeOnTheScreen();
+    expect(screen.getByText("B")).toBeOnTheScreen();
+  });
+});
+
+describe("SectionHeader", () => {
+  it("renders the title as a header and the subtitle", async () => {
+    await render(<SectionHeader title="Downloads" subtitle="2 active" />);
+    expect(screen.getByRole("header", { name: "Downloads" })).toBeOnTheScreen();
+    expect(screen.getByText("2 active")).toBeOnTheScreen();
+  });
+});
+
+describe("SheetGrabber", () => {
+  const os = Platform.OS;
+  afterEach(() => {
+    Platform.OS = os;
+  });
+
+  it("renders on Android, and not on iOS (the native grabber shows there)", async () => {
+    Platform.OS = "android";
+    const { toJSON, rerender } = await render(<SheetGrabber />);
+    expect(toJSON()).not.toBeNull();
+    Platform.OS = "ios";
+    await rerender(<SheetGrabber />);
+    expect(toJSON()).toBeNull();
   });
 });
 
 describe("InputField", () => {
   it("shows the label and reports changes", async () => {
     const onChangeText = jest.fn();
-    await render(<InputField label="Phone number" value="" onChangeText={onChangeText} />);
+    await render(
+      <InputField label="Phone number" value="" onChangeText={onChangeText} />,
+    );
     await fireEvent.changeText(screen.getByLabelText("Phone number"), "98765");
     expect(onChangeText).toHaveBeenCalledWith("98765");
   });
@@ -53,42 +166,107 @@ describe("InputField", () => {
         onChangePrefix={onChangePrefix}
       />,
     );
-    await fireEvent.changeText(screen.getByLabelText("Phone number country code"), "+44");
+    await fireEvent.changeText(
+      screen.getByLabelText("Phone number country code"),
+      "+44",
+    );
     expect(onChangePrefix).toHaveBeenCalledWith("+44");
   });
 
   it("toggles a secure value", async () => {
-    await render(<InputField label="Password" value="secret" onChangeText={jest.fn()} secure />);
+    await render(
+      <InputField
+        label="Password"
+        value="secret"
+        onChangeText={jest.fn()}
+        secure
+      />,
+    );
     expect(screen.getByLabelText("Password").props.secureTextEntry).toBe(true);
-    await fireEvent.press(screen.getByRole("button", { name: "Show password" }));
+    await fireEvent.press(
+      screen.getByRole("button", { name: "Show password" }),
+    );
     expect(screen.getByLabelText("Password").props.secureTextEntry).toBe(false);
   });
 
   it("shows the error instead of the hint", async () => {
     await render(
-      <InputField label="Password" value="" onChangeText={jest.fn()} hint="Hint" error="Wrong" />,
+      <InputField
+        label="Password"
+        value=""
+        onChangeText={jest.fn()}
+        hint="Hint"
+        error="Wrong"
+      />,
     );
     expect(screen.getByText("Wrong")).toBeOnTheScreen();
     expect(screen.queryByText("Hint")).not.toBeOnTheScreen();
+  });
+
+  it("shows a hint with an icon", async () => {
+    await render(
+      <InputField
+        label="Name"
+        value=""
+        onChangeText={jest.fn()}
+        hint="A note"
+        hintIcon="info"
+      />,
+    );
+    expect(screen.getByText("A note")).toBeOnTheScreen();
   });
 });
 
 describe("TitleBlock", () => {
   it("renders the title as a header and the body", async () => {
-    await render(<TitleBlock icon="cloud" title="Sign in with Telegram" body="Files are stored." />);
-    expect(screen.getByRole("header", { name: "Sign in with Telegram" })).toBeOnTheScreen();
+    await render(
+      <TitleBlock
+        icon="cloud"
+        title="Sign in with Telegram"
+        body="Files are stored."
+      />,
+    );
+    expect(
+      screen.getByRole("header", { name: "Sign in with Telegram" }),
+    ).toBeOnTheScreen();
     expect(screen.getByText("Files are stored.")).toBeOnTheScreen();
+  });
+
+  it("renders the centred empty state with its action", async () => {
+    const onPress = jest.fn();
+    await render(
+      <TitleBlock
+        align="center"
+        icon="folder-open"
+        title="No folders yet"
+        body="Create a folder."
+        action={<Button label="New folder" onPress={onPress} />}
+      />,
+    );
+    expect(
+      screen.getByRole("header", { name: "No folders yet" }),
+    ).toBeOnTheScreen();
+    await fireEvent.press(screen.getByRole("button", { name: "New folder" }));
+    expect(onPress).toHaveBeenCalledTimes(1);
   });
 });
 
 describe("Banner", () => {
   it("renders the text", async () => {
-    await render(<Banner icon="shield-check" text="Stored only on this device." />);
+    await render(
+      <Banner icon="shield-check" text="Stored only on this device." />,
+    );
     expect(screen.getByText("Stored only on this device.")).toBeOnTheScreen();
   });
 
   it("is an alert in the warn tone", async () => {
-    await render(<Banner icon="timer" tone="warn" text="Rate-limited — resuming in 4:12" />);
+    await render(
+      <Banner
+        icon="timer"
+        tone="warn"
+        text="Rate-limited — resuming in 4:12"
+      />,
+    );
     expect(screen.getByRole("alert")).toBeOnTheScreen();
   });
 });
@@ -96,12 +274,29 @@ describe("Banner", () => {
 describe("Screen", () => {
   it("renders the children, the footer, and the footer note", async () => {
     await render(
-      <Screen footer={<Button label="Continue" onPress={jest.fn()} />} footerNote="A note">
+      <Screen
+        footer={<Button label="Continue" onPress={jest.fn()} />}
+        footerNote="A note"
+      >
         <TitleBlock title="Title" />
       </Screen>,
     );
     expect(screen.getByText("Title")).toBeOnTheScreen();
     expect(screen.getByRole("button", { name: "Continue" })).toBeOnTheScreen();
     expect(screen.getByText("A note")).toBeOnTheScreen();
+  });
+
+  it("renders a fit screen with a muted background", async () => {
+    await render(
+      <Screen
+        fit
+        background="muted"
+        footer={<Button label="Create" onPress={jest.fn()} />}
+      >
+        <TitleBlock title="Sheet" />
+      </Screen>,
+    );
+    expect(screen.getByText("Sheet")).toBeOnTheScreen();
+    expect(screen.getByRole("button", { name: "Create" })).toBeOnTheScreen();
   });
 });

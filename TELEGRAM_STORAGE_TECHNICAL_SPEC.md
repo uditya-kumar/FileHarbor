@@ -311,9 +311,16 @@ CREATE TABLE dir_index (            -- parsed folder paths; TDLib stores the cap
   message_id INTEGER PRIMARY KEY,
   dir_path   TEXT NOT NULL,
   name       TEXT NOT NULL,
-  date       INTEGER NOT NULL
+  date       INTEGER NOT NULL,
+  size       INTEGER NOT NULL DEFAULT 0,   -- migration 2: bytes, 0 when unknown
+  mime_type  TEXT NOT NULL DEFAULT ''      -- migration 2: 04 media/document icon
 );
 CREATE INDEX idx_dir ON dir_index(dir_path);
+
+CREATE TABLE local_dir (            -- migration 2: empty folders made in 06, on this device only
+  dir_path   TEXT PRIMARY KEY,
+  created_at INTEGER NOT NULL
+);
 
 CREATE TABLE upload_queue (         -- intent TDLib has no concept of
   id         TEXT PRIMARY KEY,
@@ -325,6 +332,10 @@ CREATE TABLE upload_queue (         -- intent TDLib has no concept of
   attempts   INTEGER DEFAULT 0
 );
 ```
+
+`local_dir` is the only table that a rescan cannot rebuild. A folder with no file has no caption,
+so Telegram has no record of it. A sync deletes the row when `dir_index` has a file in that folder
+or below it. After that, the captions are the record. Log-out deletes all rows.
 
 Queue orders:
 

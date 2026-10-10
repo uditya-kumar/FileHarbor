@@ -3,7 +3,7 @@ import { replaceDirIndex } from "@/index/db";
 import { toServiceError } from "@/telegram/auth";
 import { getSavedMessagesChatId } from "@/telegram/savedMessages";
 import { getFullHistory } from "@/telegram/search";
-import type { TdMessage } from "@/telegram/types";
+import type { TdMessage, TdMessageDocument } from "@/telegram/types";
 import type {
   IndexedFile,
   ServiceResult,
@@ -47,6 +47,8 @@ export function classifyMessage(message: TdMessage): Classified {
       skip: { messageId: message.id, caption, reason: "not_document" },
     };
   }
+  const document = (message.content as unknown as TdMessageDocument).document;
+  const file = document?.document;
   // The caption name, not the document file name: a rename edits the caption only.
   return {
     kind: "file",
@@ -55,6 +57,10 @@ export function classifyMessage(message: TdMessage): Classified {
       dirPath: parsed.value.dirPath,
       name: parsed.value.name,
       date: message.date,
+      // size is 0 when TDLib does not know it; expected_size is then the best value.
+      size: file?.size || file?.expected_size || 0,
+      mimeType:
+        typeof document?.mime_type === "string" ? document.mime_type : "",
     },
   };
 }

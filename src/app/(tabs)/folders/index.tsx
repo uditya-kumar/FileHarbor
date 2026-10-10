@@ -1,113 +1,135 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Stack, useRouter } from "expo-router";
 
 import { Banner } from "@components/fileHarbourComponent/shared/Banner";
 import { Button } from "@components/fileHarbourComponent/shared/Button";
-import { FormBody } from "@components/fileHarbourComponent/shared/FormBody";
+import { ListRow } from "@components/fileHarbourComponent/shared/ListRow";
+import { RowList } from "@components/fileHarbourComponent/shared/RowList";
 import { Screen } from "@components/fileHarbourComponent/shared/Screen";
+import { SectionHeader } from "@components/fileHarbourComponent/shared/SectionHeader";
 import { TitleBlock } from "@components/fileHarbourComponent/shared/TitleBlock";
-import { getDirSummaries } from "@/index/db";
-import { syncIndex } from "@/index/sync";
-import type { DirSummary, ServiceError, SyncReport } from "@/types/domain";
+import { useColorScheme } from "@/hooks/useColorScheme";
+import { useFolderList, type FolderListNotice } from "@/hooks/useFolderList";
 
-// Temporary sync report (TaskList 5.7). It scans Saved Messages on the device and shows each
-// folder path with its file count and each caption that did not parse. Task 6.5 replaces it
-// with frames 04 (list) and 05 (empty).
+// 04 folder list and 05 empty state. The folders in the root come from the captions (spec §1).
+// A file in the root has no row here. The app always uploads into a folder.
 
-type State =
-  | { kind: "loading"; loaded: number }
-  | { kind: "done"; report: SyncReport; dirs: DirSummary[] }
-  | { kind: "error"; error: ServiceError };
-
-function errorText(error: ServiceError): string {
-  if (error.kind === "rate_limited") {
-    return `Telegram is rate-limiting. Try again in ${error.retryAfter ?? 0} s.`;
-  }
-  return `The sync did not complete: ${error.code}`;
+function NoticeBanner({ notice }: { notice: FolderListNotice }) {
+  // flood_wait uses warn, never danger: red makes users retry (CLAUDE.md §6).
+  return notice.kind === "rate_limited" ? (
+    <Banner text={notice.text} icon="timer" tone="warn" />
+  ) : (
+    <Banner text={notice.text} icon="triangle-alert" tone="danger" />
+  );
 }
 
 export default function FoldersScreen() {
-  const [state, setState] = useState<State>({ kind: "loading", loaded: 0 });
-  const mounted = useRef(true);
+  const router = useRouter();
+  const { colors } = useColorScheme();
+  const list = useFolderList();
 
-  const load = useCallback(async () => {
-    const report = await syncIndex((loaded) => {
-      if (mounted.current) setState({ kind: "loading", loaded });
-    });
-    const dirs = report.ok ? await getDirSummaries() : null;
-    if (!mounted.current) return;
-    if (!report.ok) {
-      setState({ kind: "error", error: report.error });
-    } else if (dirs && !dirs.ok) {
-      setState({ kind: "error", error: { kind: "failed", code: dirs.message } });
-    } else if (dirs?.ok) {
-      setState({ kind: "done", report: report.value, dirs: dirs.value });
-    }
-  }, []);
-
-  useEffect(() => {
-    mounted.current = true;
-    void load();
-    return () => {
-      mounted.current = false;
-    };
-  }, [load]);
-
-  const syncAgain = (): void => {
-    setState({ kind: "loading", loaded: 0 });
-    void load();
-  };
-
-  const loading = state.kind === "loading";
-  const r = state.kind === "done" ? state.report : null;
+  const openNewFolder = (): void => router.push("/folders/new");
 
   return (
-    <Screen>
-      <FormBody>
+    <Screen background="muted">
+      <Stack.Screen
+        options={{
+          headerRight: () => (
+            <Button
+              variant="header"
+              icon="circle-plus"
+              accessibilityLabel="New folder"
+              onPress={openNewFolder}
+            />
+          ),
+        }}
+      />
+      {list.status === "list" ? (
+        // Expo's native header search (CLAUDE.md §3), not the in-content field of frame 04.
+        <Stack.SearchBar
+          placeholder="Search folders by name"
+          onChangeText={(e) => list.setQuery(e.nativeEvent.text)}
+          onClose={() => list.setQuery("")}
+          autoCapitalize="none"
+          hideWhenScrolling={false}
+          textColor={colors.textPrimary}
+          hintTextColor={colors.textTertiary}
+          headerIconColor={colors.textPrimary}
+          tintColor={colors.accent}
+        />
+      ) : null}
+
+      {list.status === "loading" ? (
         <TitleBlock
-          title={loading ? "Reading Saved Messages" : "Sync report"}
-          body={
-            loading
-              ? `${state.loaded} messages read`
-              : r
-                ? `${r.scanned} messages · ${r.indexed} files · ${r.other} other · ${r.skipped.length} skipped`
-                : undefined
+          align="center"
+          icon="cloud"
+          title="Reading Saved Messages"
+          body={list.loadingText}
+        />
+      ) : null}
+
+      {list.status === "error" && list.notice ? (
+        <TitleBlock
+          align="center"
+          icon={
+            list.notice.kind === "rate_limited" ? "timer" : "triangle-alert"
+          }
+          title="The folders did not load"
+          body={list.notice.text}
+          action={
+            <Button
+              label="Try again"
+              variant="outline"
+              size="sm"
+              onPress={list.refresh}
+            />
           }
         />
-        {state.kind === "error" ? (
-          <Banner
-            text={errorText(state.error)}
-            icon={state.error.kind === "rate_limited" ? "timer" : "triangle-alert"}
-            tone={state.error.kind === "rate_limited" ? "warn" : "danger"}
-          />
-        ) : null}
-        {state.kind === "done" && state.dirs.length === 0 ? (
-          <Banner text="No file has a FileHarbor caption." icon="folder" />
-        ) : null}
-        {state.kind === "done"
-          ? state.dirs.map((d) => (
-              <Banner
-                key={d.dirPath}
-                text={`/${d.dirPath} · ${d.fileCount} ${d.fileCount === 1 ? "file" : "files"}`}
-                icon="folder"
-              />
-            ))
-          : null}
-        {r?.skipped.map((s) => (
-          <Banner
-            key={s.messageId}
-            text={`Message ${s.messageId} · ${s.reason === "bad_caption" ? "caption does not parse" : "not a document"}: ${JSON.stringify(s.caption)}`}
-            icon="triangle-alert"
-            tone="warn"
-          />
-        ))}
-        <Button
-          label="Sync again"
-          variant="secondary"
-          onPress={syncAgain}
-          loading={loading}
-          fullWidth
+      ) : null}
+
+      {list.status === "empty" ? (
+        <TitleBlock
+          align="center"
+          icon="folder-open"
+          title="No folders yet"
+          body="Create a folder, then upload photos and videos into it."
+          action={
+            <Button
+              label="New folder"
+              icon="folder-plus"
+              variant="outline"
+              size="sm"
+              onPress={openNewFolder}
+            />
+          }
         />
-      </FormBody>
+      ) : null}
+
+      {list.status === "list" ? (
+        <RowList
+          data={list.rows}
+          keyExtractor={(row) => row.dirPath}
+          refreshing={list.refreshing}
+          onRefresh={list.refresh}
+          header={
+            <>
+              <SectionHeader title={list.summary} />
+              {list.notice ? <NoticeBanner notice={list.notice} /> : null}
+              {list.noMatchText ? (
+                <Banner text={list.noMatchText} icon="info" />
+              ) : null}
+            </>
+          }
+          // The folder screen (07) comes in task 7.6.
+          renderItem={({ item }) => (
+            <ListRow
+              icon={item.kind === "documents" ? "file-text" : "folder"}
+              title={item.title}
+              subtitle={item.subtitle}
+              trailing="chevron"
+            />
+          )}
+        />
+      ) : null}
     </Screen>
   );
 }

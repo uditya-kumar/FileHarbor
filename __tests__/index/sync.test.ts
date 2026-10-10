@@ -30,6 +30,7 @@ const doc = (
       "@type": "document",
       file_name: fileName,
       mime_type: "image/jpeg",
+      document: { "@type": "file", id, size: 1000 + id, expected_size: 0 },
     },
     caption: { "@type": "formattedText", text: caption },
   },
@@ -84,7 +85,27 @@ describe("classifyMessage", () => {
         dirPath: "Holiday/Beach",
         name: "a.heic",
         date: 1700000005,
+        size: 1005,
+        mimeType: "image/jpeg",
       },
+    });
+  });
+
+  it('uses expected_size when the size is not known, and 0 and "" with no document data', () => {
+    const partial = doc(14, fh(["X"], "a.bin"));
+    const content = partial.content as unknown as {
+      document: { document: { size: number; expected_size: number } };
+    };
+    content.document.document.size = 0;
+    content.document.document.expected_size = 777;
+    expect(classifyMessage(partial)).toMatchObject({ file: { size: 777 } });
+
+    const bare = withContent(15, {
+      "@type": "messageDocument",
+      caption: { "@type": "formattedText", text: fh(["X"], "a.bin") },
+    });
+    expect(classifyMessage(bare)).toMatchObject({
+      file: { size: 0, mimeType: "" },
     });
   });
 
@@ -158,7 +179,14 @@ describe("syncIndex", () => {
       },
     });
     expect(replace).toHaveBeenCalledWith([
-      { messageId: 3, dirPath: "A", name: "x.jpg", date: 1700000003 },
+      {
+        messageId: 3,
+        dirPath: "A",
+        name: "x.jpg",
+        date: 1700000003,
+        size: 1003,
+        mimeType: "image/jpeg",
+      },
     ]);
   });
 
