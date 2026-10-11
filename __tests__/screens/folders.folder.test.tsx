@@ -3,6 +3,7 @@ import type { ReactElement } from "react";
 
 import FolderScreen from "@/app/(tabs)/folders/[folderId]";
 import { loadFolderFiles, loadThumbnail, syncIndex } from "@/index/sync";
+import { addDownloads } from "@/transfer/downloads";
 import type { FolderFile } from "@/types/domain";
 
 import { mockParams, mockRouter, mockStack, resetAuthMocks } from "./authMocks";
@@ -13,12 +14,17 @@ jest.mock("@/index/sync", () => ({
   loadThumbnail: jest.fn(),
   syncIndex: jest.fn(),
 }));
+jest.mock("@/transfer/downloads", () => ({
+  addDownloads: jest.fn(),
+  MAX_PARALLEL_DOWNLOADS: 4,
+}));
 // The grid cells are checked in components/gallery.test.tsx.
 jest.mock("expo-image", () => ({ Image: () => null }));
 
 const load = loadFolderFiles as jest.Mock;
 const thumb = loadThumbnail as jest.Mock;
 const sync = syncIndex as jest.Mock;
+const add = addDownloads as jest.Mock;
 
 const MB = 1024 ** 2;
 const file = (
@@ -57,6 +63,7 @@ beforeEach(() => {
   load.mockReset().mockResolvedValue({ ok: true, value: files });
   thumb.mockReset().mockResolvedValue({ ok: true, value: "file:///t.jpg" });
   sync.mockReset().mockResolvedValue({ ok: true, value: {} });
+  add.mockReset().mockReturnValue(1);
 });
 
 describe("Folder 07 — grid", () => {
@@ -167,14 +174,35 @@ describe("Folder 08 — multi-select", () => {
     expect(mockStack.options.title).toBe("0 selected");
   });
 
-  it("does not download or delete until those steps are built", async () => {
+  it("adds the selected files to the Downloads tab and closes the selection", async () => {
     await render(<FolderScreen />);
     await screen.findByText("3 items · 6 MB");
     await longPress("Photo, IMG_3.jpg");
+    await fireEvent.press(screen.getByLabelText("Video, clip.mp4"));
+    expect(screen.getByText("4 files download in parallel")).toBeOnTheScreen();
+    await fireEvent.press(
+      screen.getByRole("button", { name: "Download 2 items" }),
+    );
+    expect(add).toHaveBeenCalledTimes(1);
+    expect((add.mock.calls[0] as [FolderFile[]])[0].map((f) => f.name)).toEqual(
+      ["IMG_3.jpg", "clip.mp4"],
+    );
+    expect(mockStack.options.title).toBe("Beach");
+    expect(screen.getByText("3 items · 6 MB")).toBeOnTheScreen();
+  });
+
+  it("does not download with no file selected, and does not delete yet", async () => {
+    await render(<FolderScreen />);
+    await screen.findByText("3 items · 6 MB");
+    await headerButton("headerRight", "Select");
+    expect(screen.getByRole("button", { name: "Download" })).toBeDisabled();
+    await fireEvent.press(screen.getByLabelText("Photo, IMG_3.jpg"));
     expect(
       screen.getByRole("button", { name: "Download 1 item" }),
-    ).toBeDisabled();
+    ).toBeEnabled();
+    // Delete is a Telegram write (Phase 8).
     expect(screen.getByRole("button", { name: "Delete" })).toBeDisabled();
+    expect(add).not.toHaveBeenCalled();
   });
 
   it("closes the selection and shows the folder again", async () => {

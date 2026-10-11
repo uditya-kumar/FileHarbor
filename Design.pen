@@ -1,5 +1,5 @@
 {
-  "version": "2.17",
+  "version": "2.21",
   "children": [
     {
       "type": "frame",
@@ -5875,136 +5875,6 @@
               "gap": 12,
               "children": [
                 {
-                  "type": "frame",
-                  "id": "dSUF1",
-                  "name": "Overall Progress",
-                  "width": "fill_container",
-                  "fill": "$bg",
-                  "cornerRadius": 12,
-                  "stroke": "$border",
-                  "strokeWidth": 1,
-                  "strokeAlignment": "inner",
-                  "layout": "vertical",
-                  "gap": 10,
-                  "padding": 14,
-                  "children": [
-                    {
-                      "type": "frame",
-                      "id": "RaaKZ",
-                      "name": "Row",
-                      "width": "fill_container",
-                      "justifyContent": "space_between",
-                      "alignItems": "center",
-                      "children": [
-                        {
-                          "type": "text",
-                          "id": "B17xT",
-                          "name": "Name",
-                          "fill": "$text-primary",
-                          "content": "Goa 2024",
-                          "fontFamily": "$font",
-                          "fontSize": 15,
-                          "fontWeight": "600"
-                        },
-                        {
-                          "type": "text",
-                          "id": "yC3Nf",
-                          "name": "Pct",
-                          "fill": "$text-tertiary",
-                          "content": "25%",
-                          "fontFamily": "$font",
-                          "fontSize": 13,
-                          "fontWeight": "500"
-                        }
-                      ]
-                    },
-                    {
-                      "type": "frame",
-                      "id": "FSDFI",
-                      "name": "Track",
-                      "width": "fill_container",
-                      "height": 6,
-                      "fill": "$bg-sunken",
-                      "cornerRadius": 3,
-                      "children": [
-                        {
-                          "type": "frame",
-                          "id": "FkjQO",
-                          "name": "Fill",
-                          "width": 80,
-                          "height": 6,
-                          "fill": "$accent",
-                          "cornerRadius": 3
-                        }
-                      ]
-                    },
-                    {
-                      "type": "frame",
-                      "id": "J1Lz6o",
-                      "name": "Meta",
-                      "width": "fill_container",
-                      "justifyContent": "space_between",
-                      "children": [
-                        {
-                          "type": "text",
-                          "id": "aEl3r",
-                          "name": "Files",
-                          "fill": "$text-tertiary",
-                          "content": "37 of 148 files · 4 albums sent",
-                          "fontFamily": "$font",
-                          "fontSize": 11,
-                          "fontWeight": "normal"
-                        },
-                        {
-                          "type": "text",
-                          "id": "C0nVhA",
-                          "name": "Left",
-                          "fill": "$text-tertiary",
-                          "content": "about 12 min left",
-                          "fontFamily": "$font",
-                          "fontSize": 11,
-                          "fontWeight": "normal"
-                        }
-                      ]
-                    }
-                  ]
-                },
-                {
-                  "type": "frame",
-                  "id": "YAN81",
-                  "name": "Pacing Note",
-                  "width": "fill_container",
-                  "fill": "$warn-soft",
-                  "cornerRadius": 10,
-                  "gap": 10,
-                  "padding": 13,
-                  "children": [
-                    {
-                      "type": "icon",
-                      "id": "p1eSY",
-                      "name": "Icon",
-                      "width": 15,
-                      "height": 15,
-                      "icon": "gauge",
-                      "library": "lucide",
-                      "fill": "$warn"
-                    },
-                    {
-                      "type": "text",
-                      "id": "WkO3m",
-                      "name": "Text",
-                      "fill": "$warn",
-                      "textGrowth": "fixed-width",
-                      "width": 272,
-                      "content": "Paced at one message every 2.5 s, batched into albums of 10, to stay clear of FLOOD_WAIT.",
-                      "lineHeight": 1.45,
-                      "fontFamily": "$font",
-                      "fontSize": 12,
-                      "fontWeight": "normal"
-                    }
-                  ]
-                },
-                {
                   "id": "t7fPF7",
                   "type": "ref",
                   "ref": "N1Y7x",
@@ -6045,7 +5915,7 @@
                       "content": "IMG_5002.HEIC"
                     },
                     "S0PYw": {
-                      "content": "Sent · one message, one file",
+                      "content": "Sent ",
                       "fill": "$success"
                     },
                     "T1ss0": {
@@ -6070,7 +5940,7 @@
                       "content": "VID_0101.mp4"
                     },
                     "S0PYw": {
-                      "content": "Failed · FLOOD_WAIT 34s · tap to retry",
+                      "content": "Failed · tap to retry",
                       "fill": "$danger"
                     },
                     "T1ss0": {

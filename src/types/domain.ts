@@ -84,6 +84,32 @@ export type FileProgress = {
   localUri: string | null;
 };
 
+/**
+ * A file in the Downloads tab (12). "paused": the user stopped it; the parts on the device
+ * stay. "failed": TDLib gave an error; the user can start it again.
+ */
+export type DownloadStatus = "queued" | "downloading" | "paused" | "failed";
+
+/** One file in the Downloads list. It leaves the list when the whole file is on the device. */
+export type DownloadItem = {
+  fileId: number;
+  messageId: number;
+  dirPath: string;
+  name: string;
+  kind: MediaKind;
+  /** Bytes. 0 when unknown. */
+  size: number;
+  thumbnailUri: string | null;
+  placeholderUri: string | null;
+  status: DownloadStatus;
+  /** Bytes on the device. */
+  downloaded: number;
+  /** null until the speed has a first measure, and when the file does not download. */
+  bytesPerSecond: number | null;
+  /** Set only when the status is "failed". */
+  error: ServiceError | null;
+};
+
 /** A folder on the device that the user picked to save a file in (sheet 11). */
 export type SaveFolder = {
   /** A content:// URI. */

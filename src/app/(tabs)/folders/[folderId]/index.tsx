@@ -9,6 +9,7 @@ import { SectionHeader } from "@components/fileHarbourComponent/shared/SectionHe
 import { TitleBlock } from "@components/fileHarbourComponent/shared/TitleBlock";
 import { useFolderContents } from "@/hooks/useFolderContents";
 import { useSelection } from "@/hooks/useSelection";
+import { addDownloads, MAX_PARALLEL_DOWNLOADS } from "@/transfer/downloads";
 
 // 07 folder grid and 08 multi-select. `folderId` is the folder path from the captions, e.g.
 // "Holiday/Beach" (spec §1). A photo or video cell opens the viewer (09, 10); another file opens
@@ -144,10 +145,21 @@ export default function FolderScreen() {
         />
       ) : null}
 
-      {/* Download connects in task 7.12 (useDownloads). Delete is a Telegram write: it comes
+      {/* Download adds the files to the Downloads tab. Delete is a Telegram write: it comes
           with the trash in Phase 8, after the write path. */}
       {picked && folder.status === "grid" ? (
-        <SelectionToolbar downloadLabel={picked.downloadLabel} />
+        <SelectionToolbar
+          downloadLabel={picked.downloadLabel}
+          hint={`${MAX_PARALLEL_DOWNLOADS} files download in parallel`}
+          onDownload={
+            picked.files.length > 0
+              ? () => {
+                  addDownloads(picked.files);
+                  selection.exit();
+                }
+              : undefined
+          }
+        />
       ) : null}
     </Screen>
   );

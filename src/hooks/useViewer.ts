@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { formatBytes, formatDate } from "@/format/units";
 import { noticeFor } from "@/hooks/useFolderContents";
 import { loadFolderFiles, loadThumbnail, viewFile } from "@/index/sync";
+import { isInDownloads } from "@/transfer/downloads";
 import type { FileProgress, FolderFile, ServiceError } from "@/types/domain";
 
 // Screen state for the viewer (09 photo, 10 video). It pages through the photos and videos of
@@ -141,7 +142,8 @@ export function useViewer(dirPath: string, messageId: number) {
     }
   }, [all, index]);
 
-  // The whole open file. Leaving the page stops a download that the viewer started.
+  // The whole open file. Leaving the page stops a download that the viewer started, but not
+  // a file in the Downloads tab.
   const openId = open?.messageId;
   const openFileId = open?.fileId;
   const openDone =
@@ -163,6 +165,7 @@ export function useViewer(dirPath: string, messageId: number) {
           progress: prev?.fileId === openFileId ? prev.progress : null,
           error,
         })),
+      isInDownloads,
     );
     // openDone is read once per file: a file that completes keeps its URI in `local`.
     // eslint-disable-next-line react-hooks/exhaustive-deps

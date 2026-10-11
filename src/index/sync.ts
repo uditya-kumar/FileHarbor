@@ -235,11 +235,15 @@ function toProgress(file: TdFile): FileProgress {
  * progress comes from updateFile. Call the returned function when the file is not on screen:
  * it stops the reports and cancels a download that this call started. The parts on the
  * device stay, so the next open continues from them.
+ *
+ * @param keep Read when the file closes. True: do not cancel, because another part of the app
+ *   needs the download too (the Downloads tab).
  */
 export function viewFile(
   fileId: number,
   onChange: (progress: FileProgress) => void,
   onError: (error: ServiceError) => void,
+  keep?: (fileId: number) => boolean,
 ): () => void {
   let stopped = false;
   let started = false;
@@ -269,6 +273,34 @@ export function viewFile(
   return () => {
     stopped = true;
     unsubscribe();
-    if (started && !complete) void cancelDownload(fileId);
+    if (started && !complete && !keep?.(fileId)) void cancelDownload(fileId);
   };
+}
+
+/**
+ * Downloads the whole file for the Downloads tab, and resolves when it is on the device
+ * (spec §3.2.5: the wrapped call, priority 1). Read the progress from `watchFiles`.
+ */
+export async function fetchFile(
+  fileId: number,
+): Promise<ServiceResult<string>> {
+  const res = await downloadFile(fileId);
+  if (!res.ok) return { ok: false, error: toServiceError(res.error) };
+  const uri = completedUri(res.value);
+  return uri
+    ? { ok: true, value: uri }
+    : { ok: false, error: { kind: "failed", code: "DOWNLOAD_INCOMPLETE" } };
+}
+
+/** Stops a download (spec §8.6). The parts on the device stay, so a new start continues. */
+export async function stopFile(fileId: number): Promise<ServiceResult<void>> {
+  const res = await cancelDownload(fileId);
+  return res.ok ? res : { ok: false, error: toServiceError(res.error) };
+}
+
+/** The progress of each file that changes. Call the returned function to stop. */
+export function watchFiles(
+  handler: (fileId: number, progress: FileProgress) => void,
+): () => void {
+  return onFileUpdate((file) => handler(file.id, toProgress(file)));
 }

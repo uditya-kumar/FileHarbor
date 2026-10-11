@@ -210,8 +210,8 @@ needs them.
       Status: the layout exists, because task 4.8 needs the route for its guard. The icons use
       the `md` prop (Material Symbols names), not drawables in `assets/icons/`. 👤 Confirm this,
       or ask for drawables and a config plugin that copies them into `android/app/src/main/res`.
-      Open: the Downloads `Badge` waits for `useDownloads` (task 7.12). Compare the tab bar with
-      the `Chrome / …` frames.
+      The Downloads `Badge` is done (task 7.12). Open: compare the tab bar with the
+      `Chrome / …` frames.
 - [x] 6.2 Write `folders/_layout.tsx`, `transfers/_layout.tsx`, `settings/_layout.tsx` (Stack only).
       Done. `transfers/index.tsx` redirects to `./downloads`. The Downloads, Uploads, and
       Settings screens are placeholders until tasks 7.14, 9.6, and 11.4.
@@ -285,8 +285,7 @@ needs them.
         Fix (user): the close icon touched the title. `Button headerLeading` adds the 08 gap
         (22, `Layout.header.leadingGap`). 📱 Check it on the device.
       - Compare to frame 08 in light (dark is checked on the device).
-      - Download is disabled. Connect it in task 7.12 (`useDownloads`). Add the hint
-        "4 files download in parallel" then, from the real concurrency.
+      - Download is connected (task 7.12), with the hint "4 files download in parallel".
       - Delete is disabled. It is a Telegram write, so it comes with the trash (Phase 8).
 - [x] 7.9 Write the viewer components: `PhotoViewer`, `VideoViewer`, `ViewerFileMeta`,
       `ViewerFilmstrip`, `ViewerActionRow`.
@@ -401,7 +400,37 @@ needs them.
       - 📱 Do on a device: compare 11 with `Design.pen` (light and dark).
       - A picker cancel gives `ERR_PICKER_CANCELLED`. expo-modules-core makes this code from
         the class name `PickerCancelledException`.
-- [ ] 7.12 Write `src/hooks/useDownloads.ts`. Add the Downloads tab badge (hide it at zero).
+- [x] 7.12 Write `src/hooks/useDownloads.ts`. Add the Downloads tab badge (hide it at zero).
+      Status: done. tsc, lint, and jest pass (352 tests). The audits are clean.
+      Device test ✅: 08 Download of 4 files sets the badge to 4. The badge goes down to 0.
+      - New: `src/transfer/downloads.ts` keeps the Downloads list in memory.
+        - It starts 4 files at the same time (`MAX_PARALLEL_DOWNLOADS`, spec §8.4). The other
+          files wait in the queue, in the order that the user added them.
+        - It reads the progress from `updateFile` through one `watchFiles` listener. The listener
+          is on only while the list has a file.
+        - It measures the speed one time each second. It tells the screens about a progress
+          change not more than 4 times a second. It tells them about a status change at once.
+        - A file leaves the list when it is complete. This is also true when the viewer
+          downloaded it.
+        - Pause cancels the file in TDLib. The parts on the device stay, and resume continues
+          from them. Remove (for 14) cancels and takes the file out.
+        - There is no "Retrying in 4s · attempt 2 of 5" row from the design. TDLib does the
+          retries, and the app must not add a backoff (CLAUDE.md §1). A failed file shows its
+          error. The user can start it again. A rate limit shows with `warn`.
+      - New in `src/index/sync.ts`: `fetchFile`, `stopFile`, `watchFiles`. `viewFile` has a
+        `keep` parameter. The viewer and sheet 11 do not cancel a file in the Downloads list.
+      - `useDownloads()` gives the 12 rows ("12.4 MB of 51.8 MB · 2.1 MB/s",
+        "Paused · 24.1 MB of 88.2 MB", "Queued · 1.2 MB") and the summary
+        ("3 downloading · 2 queued"). `useDownloadBadge()` gives the badge count.
+      - The badge shows the files that download now, as in the design ("3" for
+        "3 downloading · 2 queued"). It uses `accent` and `onAccent`. It hides at zero.
+      - 08: Download adds the selected files to the list and closes the selection. The hint
+        "4 files download in parallel" is above the buttons. A file that is on the device
+        already is not added (task 7.16 saves it to the gallery).
+      - Open:
+        - The list is not kept after an app restart. A TDLib file id is valid in one TDLib
+          instance only. The parts on the device stay.
+        - Clear the list at log-out (with task 11.4).
 - [ ] 7.13 Write `shared/ProgressBar.tsx` and `transfers/TransferRow.tsx`.
        Status: `ProgressBar` is done (task 7.9). Use `tone="accent"`.
 - [ ] 7.14 Write screen 12 `transfers/downloads/index.tsx` and `transfers/index.tsx` (redirect).

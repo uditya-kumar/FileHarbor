@@ -4,6 +4,7 @@ import { formatBytes, formatDate } from "@/format/units";
 import { noticeFor } from "@/hooks/useFolderContents";
 import { loadFolderFiles, viewFile } from "@/index/sync";
 import { copyToFolder, pickSaveFolder } from "@/media/saveToDevice";
+import { isInDownloads } from "@/transfer/downloads";
 import type {
   FileProgress,
   FolderFile,
@@ -132,7 +133,8 @@ export function useFileSheet(dirPath: string, messageId: number) {
     });
     return () => {
       mounted.current = false;
-      // Closing the sheet stops a download that it started. The parts on the device stay.
+      // Closing the sheet stops a download that it started, but not a file in the Downloads
+      // tab. The parts on the device stay.
       stopDownload.current?.();
       stopDownload.current = null;
     };
@@ -161,6 +163,7 @@ export function useFileSheet(dirPath: string, messageId: number) {
               setPhase({ step: "downloading", percent: percentOf(progress) });
           },
           (error) => finish({ ok: false, error }),
+          isInDownloads,
         );
         stopDownload.current = stop;
       }),
