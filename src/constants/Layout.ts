@@ -72,7 +72,11 @@ export const Layout = {
     playIcon: 26,
     placeholderIcon: 44,
   },
-  // 10 scrubber; the 12 and 13 transfer bars use the same track.
+  // 12–14: the Downloads / Uploads switch at the top of the page.
+  segmented: { top: 14, height: 34, pad: 3, gap: 2, radius: 9, itemRadius: 7 },
+  // 12–14 transfer row: a 38 tile, the text, and a 36 round button.
+  transfer: { tile: 38, tileIcon: 16, gap: 12, action: 36, actionIcon: 16 },
+  // 10 scrubber.
   progress: { track: 3, radius: 2, knob: 12, hitSlop: 12 },
   hairline: 1,
 } as const;

@@ -3,6 +3,7 @@ import { useMemo, useSyncExternalStore } from "react";
 import { formatBytes } from "@/format/units";
 import {
   getDownloads,
+  MAX_PARALLEL_DOWNLOADS,
   pauseDownload,
   removeDownloads,
   resumeDownload,
@@ -26,8 +27,6 @@ export type DownloadRow = {
   detail: string;
   /** A rate limit shows with warn tones, never danger (CLAUDE.md §6). */
   detailTone: "normal" | "warn" | "danger";
-  /** 0–1. null when the size is unknown. */
-  progress: number | null;
 };
 
 function amount(item: DownloadItem): string {
@@ -82,10 +81,6 @@ function toRow(item: DownloadItem): DownloadRow {
     placeholderUri: item.placeholderUri,
     status: item.status,
     ...detailOf(item),
-    progress:
-      item.size > 0
-        ? Math.min(1, Math.max(0, item.downloaded / item.size))
-        : null,
   };
 }
 
@@ -118,6 +113,7 @@ export function useDownloads() {
   return {
     rows,
     summary,
+    hint: `${MAX_PARALLEL_DOWNLOADS} files download in parallel`,
     empty: items.length === 0,
     pause: pauseDownload,
     resume: resumeDownload,

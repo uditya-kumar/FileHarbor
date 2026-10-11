@@ -431,10 +431,41 @@ needs them.
         - The list is not kept after an app restart. A TDLib file id is valid in one TDLib
           instance only. The parts on the device stay.
         - Clear the list at log-out (with task 11.4).
-- [ ] 7.13 Write `shared/ProgressBar.tsx` and `transfers/TransferRow.tsx`.
-       Status: `ProgressBar` is done (task 7.9). Use `tone="accent"`.
-- [ ] 7.14 Write screen 12 `transfers/downloads/index.tsx` and `transfers/index.tsx` (redirect).
+- [x] 7.13 Write `shared/ProgressBar.tsx` and `transfers/TransferRow.tsx`.
+       Status: done. `ProgressBar` is done (task 7.9), but the transfer rows do not use it.
+      - User decision: a transfer row has no progress bar. The status text
+        ("12.4 MB of 51.8 MB · 2.1 MB/s") is sufficient. Design.pen `N1Y7x` has no bar too.
+      - `TransferRow`: a 38 tile, the name, the status line, and a 36 round button.
+        - The tile shows the thumbnail (`recyclingKey` is set) or the file type icon.
+        - The status line is tertiary, `warn` for a rate limit, and `danger` for an error.
+        - Reason it is not `ListRow` plus props: it has a thumbnail tile, a toned status line,
+          and a round action button. `ListRow` has none of them.
+      - New `Button` variant `sunken` and size `round` (the 36 pause and play button). A
+        disabled `sunken` button has a tertiary icon, not a lower opacity (12 queued row).
+      - New `shared/SegmentedControl.tsx` (Downloads / Uploads, 12–14).
+      - New icons: `download`, `rotate-ccw`, `video`. New tokens: `Layout.segmented`,
+        `Layout.transfer`.
+- [x] 7.14 Write screen 12 `transfers/downloads/index.tsx` and `transfers/index.tsx` (redirect).
        Do the screen checks.
+      Status: done. tsc, lint, and jest pass (365 tests). The audits are clean.
+      Device test ✅ (dark): the rows, the thumbnails, the speed, and the badge are correct.
+      - The header title is "Transfers" (design). The More icon is not there. It comes when it
+        has a function.
+      - The switch replaces the screen with no animation. The Uploads placeholder has the
+        switch too, so the user can go back.
+      - The summary is "4 downloading · 1 queued · 1 paused". The sub line is
+        "4 files download in parallel". "long-press an item to select" comes with task 7.15.
+      - The row buttons:
+
+        | Status | Icon | Action |
+        |---|---|---|
+        | downloading | pause | pause |
+        | paused | play | resume |
+        | queued | play (disabled) | none, it waits for a free place |
+        | failed | rotate-ccw | start again |
+
+      - Empty state: "No downloads" with a short help text. Design.pen has no frame for it.
+      - Open: 📱 compare 12 with Design.pen in light.
 - [ ] 7.15 Write screen 14 (selection mode in screen 12). Do the screen checks.
 - [ ] 7.16 Write `src/hooks/useMediaPermissions.ts`. Save downloads with `expo-media-library`.
 - [ ] 7.17 📱 Download the 51.8 MB video. Make sure that its SHA-256 is correct.

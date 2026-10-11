@@ -18,8 +18,16 @@ export default function TransfersLayout() {
       }}
     >
       <Stack.Screen name="index" options={{ headerShown: false }} />
-      <Stack.Screen name="downloads/index" options={{ title: "Downloads" }} />
-      <Stack.Screen name="uploads/index" options={{ title: "Uploads" }} />
+      {/* 12 and 13 are one page with a switch (Downloads / Uploads), so the switch replaces
+          the screen with no animation. */}
+      <Stack.Screen
+        name="downloads/index"
+        options={{ title: "Transfers", animation: "none" }}
+      />
+      <Stack.Screen
+        name="uploads/index"
+        options={{ title: "Transfers", animation: "none" }}
+      />
     </Stack>
   );
 }

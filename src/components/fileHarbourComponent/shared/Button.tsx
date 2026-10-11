@@ -20,9 +20,14 @@ type Variant =
   | "ghost"
   | "header"
   | "viewer"
-  | "viewerDestructive";
-/** "pill": 52 high and fully round (08 action bar). With no label it is a 52 circle. */
-type Size = "lg" | "md" | "sm" | "pill";
+  | "viewerDestructive"
+  /** A sunken circle in a row (12 pause and play). Disabled, its icon is tertiary. */
+  | "sunken";
+/**
+ * "pill": 52 high and fully round (08 action bar). With no label it is a 52 circle.
+ * "round": a 36 circle for an icon only (12 transfer row).
+ */
+type Size = "lg" | "md" | "sm" | "pill" | "round";
 
 type Props = {
   label?: string;
@@ -99,6 +104,12 @@ function lookFor(
       };
     case "viewerDestructive":
       return { fg: colors.viewerDanger, weight: "500" };
+    case "sunken":
+      return {
+        bg: colors.bgSunken,
+        fg: disabled ? colors.textTertiary : colors.textPrimary,
+        weight: "500",
+      };
   }
 }
 
@@ -118,6 +129,8 @@ export function Button({
   const { colors } = useColorScheme();
   const look = lookFor(variant, colors, disabled);
   const ghost = variant === "ghost";
+  // These variants show disabled with a colour, not with a lower opacity.
+  const tintDisabled = ghost || variant === "sunken";
   const top = iconPosition === "top";
   // ghost, header, and the viewer variants have no box, so they ignore size.
   const bare =
@@ -143,11 +156,13 @@ export function Button({
         ? 14
         : size === "sm"
           ? 16
-          : size === "pill"
-            ? label
-              ? 18
-              : 19
-            : 17;
+          : size === "round"
+            ? Layout.transfer.actionIcon
+            : size === "pill"
+              ? label
+                ? 18
+                : 19
+              : 17;
 
   return (
     <Pressable
@@ -167,7 +182,7 @@ export function Button({
           backgroundColor: look.bg,
           borderColor: look.border,
           borderWidth: look.border ? Layout.hairline : 0,
-          opacity: pressed ? 0.7 : disabled && !ghost ? 0.4 : 1,
+          opacity: pressed ? 0.7 : disabled && !tintDisabled ? 0.4 : 1,
         },
       ]}
     >
@@ -224,6 +239,11 @@ const sizeStyles = StyleSheet.create({
     height: Layout.control.height,
     paddingHorizontal: 18,
     borderRadius: Layout.radius.pill,
+  },
+  round: {
+    width: Layout.transfer.action,
+    height: Layout.transfer.action,
+    borderRadius: Layout.transfer.action / 2,
   },
   sm: {
     paddingVertical: 12,

@@ -85,7 +85,7 @@ describe("useDownloads", () => {
       jest.advanceTimersByTime(250);
     });
     expect(detail(1)).toBe("3.1 MB of 10 MB · 2.1 MB/s");
-    expect(result.current.rows[0]?.progress).toBeCloseTo(0.31);
+    expect(result.current.hint).toBe("4 files download in parallel");
   });
 
   it("shows a rate limit with warn tones and the wait time", async () => {
@@ -117,7 +117,6 @@ describe("useDownloads", () => {
     expect(result.current.rows[0]).toMatchObject({
       detail: "Not downloaded (FILE_ID_INVALID). Try again.",
       detailTone: "danger",
-      progress: null,
     });
   });
 });

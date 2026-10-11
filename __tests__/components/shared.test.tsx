@@ -14,6 +14,7 @@ import { RowList } from "@components/fileHarbourComponent/shared/RowList";
 import { Screen } from "@components/fileHarbourComponent/shared/Screen";
 import { SearchField } from "@components/fileHarbourComponent/shared/SearchField";
 import { SectionHeader } from "@components/fileHarbourComponent/shared/SectionHeader";
+import { SegmentedControl } from "@components/fileHarbourComponent/shared/SegmentedControl";
 import { SheetGrabber } from "@components/fileHarbourComponent/shared/SheetGrabber";
 import { TitleBlock } from "@components/fileHarbourComponent/shared/TitleBlock";
 
@@ -145,6 +146,47 @@ describe("Button", () => {
     ).toBe(Colors.light.viewerDanger);
     await fireEvent.press(screen.getByRole("button", { name: "Share" }));
     expect(onPress).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("Button round sunken (12 row action)", () => {
+  it("is a 36 circle on bgSunken; disabled, its icon is tertiary at full opacity", async () => {
+    const { rerender } = await render(
+      <Button
+        variant="sunken"
+        size="round"
+        icon="pause"
+        accessibilityLabel="Pause"
+        onPress={jest.fn()}
+      />,
+    );
+    const style = () =>
+      StyleSheet.flatten(
+        screen.getByRole("button", { name: "Pause" }).props.style,
+      );
+    expect(style()).toMatchObject({
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      backgroundColor: Colors.light.bgSunken,
+      opacity: 1,
+    });
+    await rerender(
+      <Button
+        variant="sunken"
+        size="round"
+        icon="play"
+        accessibilityLabel="Queued"
+        onPress={jest.fn()}
+        disabled
+      />,
+    );
+    expect(screen.getByRole("button", { name: "Queued" })).toBeDisabled();
+    expect(
+      StyleSheet.flatten(
+        screen.getByRole("button", { name: "Queued" }).props.style,
+      ).opacity,
+    ).toBe(1);
   });
 });
 
@@ -515,5 +557,29 @@ describe("Screen", () => {
     );
     expect(screen.getByText("Sheet")).toBeOnTheScreen();
     expect(screen.getByRole("button", { name: "Create" })).toBeOnTheScreen();
+  });
+});
+
+describe("SegmentedControl", () => {
+  const OPTIONS = [
+    { key: "downloads", label: "Downloads" },
+    { key: "uploads", label: "Uploads" },
+  ] as const;
+
+  it("marks the selected tab and gives the key of another tab", async () => {
+    const onChange = jest.fn();
+    await render(
+      <SegmentedControl
+        options={OPTIONS}
+        value="downloads"
+        onChange={onChange}
+      />,
+    );
+    expect(screen.getByRole("tab", { name: "Downloads" })).toBeSelected();
+    expect(screen.getByRole("tab", { name: "Uploads" })).not.toBeSelected();
+    await fireEvent.press(screen.getByRole("tab", { name: "Downloads" }));
+    expect(onChange).not.toHaveBeenCalled();
+    await fireEvent.press(screen.getByRole("tab", { name: "Uploads" }));
+    expect(onChange).toHaveBeenCalledWith("uploads");
   });
 });

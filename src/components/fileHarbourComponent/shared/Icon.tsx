@@ -8,6 +8,7 @@ import {
   Cloud,
   CloudDownload,
   Copy,
+  Download,
   Ellipsis,
   Eye,
   EyeOff,
@@ -21,6 +22,7 @@ import {
   LogOut,
   Pause,
   Play,
+  RotateCcw,
   Search,
   Share2,
   ShieldCheck,
@@ -28,6 +30,7 @@ import {
   Timer,
   Trash2,
   TriangleAlert,
+  Video,
   X,
   type LucideIcon,
 } from "lucide-react-native";
@@ -44,6 +47,7 @@ const icons = {
   cloud: Cloud,
   "cloud-download": CloudDownload,
   copy: Copy,
+  download: Download,
   ellipsis: Ellipsis,
   eye: Eye,
   "eye-off": EyeOff,
@@ -57,6 +61,7 @@ const icons = {
   "log-out": LogOut,
   pause: Pause,
   play: Play,
+  "rotate-ccw": RotateCcw,
   search: Search,
   "share-2": Share2,
   "shield-check": ShieldCheck,
@@ -64,6 +69,7 @@ const icons = {
   timer: Timer,
   "trash-2": Trash2,
   "triangle-alert": TriangleAlert,
+  video: Video,
   x: X,
 } satisfies Record<string, LucideIcon>;
 
