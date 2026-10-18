@@ -2,7 +2,6 @@ import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { StrictMode, useEffect } from "react";
-import { LogBox } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import "react-native-reanimated";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -21,9 +20,17 @@ const SPLASH_MAX_MS = 4000;
 
 SplashScreen.preventAutoHideAsync();
 
-// gesture-handler 2.32 calls findNodeHandle in GestureDetector, and StrictMode warns about it on
-// each viewer page (09, 10). It is a dev-only warning from the library, not from app code.
-LogBox.ignoreLogs(["findNodeHandle is deprecated in StrictMode"]);
+// gesture-handler 2.32 calls findNodeHandle on the `Wrap` class in GestureDetector, and
+// StrictMode logs a console.error for it when the first viewer page (09, 10) opens. It is a
+// dev-only warning from the library, not from app code. LogBox.ignoreLogs hides only the phone
+// overlay: Metro still prints it. So only this one message is dropped, before LogBox and Metro.
+if (__DEV__) {
+  const consoleError = console.error;
+  console.error = (...args: unknown[]) => {
+    if (args[1] === "findNodeHandle" && args[3] === "Wrap") return;
+    consoleError(...args);
+  };
+}
 
 export default function RootLayout() {
   return (
