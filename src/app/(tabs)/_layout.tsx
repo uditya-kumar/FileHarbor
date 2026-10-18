@@ -28,8 +28,9 @@ export default function TabsLayout() {
       <NativeTabs.Trigger name="transfers">
         <NativeTabs.Trigger.Label>Downloads</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon sf="arrow.down.circle" md="download" />
+        {/* expo-router ignores `hidden` when the badge has a value: "0" showed. No value at 0. */}
         <NativeTabs.Trigger.Badge hidden={downloading === 0}>
-          {String(downloading)}
+          {downloading > 0 ? String(downloading) : undefined}
         </NativeTabs.Trigger.Badge>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="settings">

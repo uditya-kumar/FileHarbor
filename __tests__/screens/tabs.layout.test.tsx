@@ -21,13 +21,20 @@ jest.mock("expo-router/unstable-native-tabs", () => {
     <Text>{children}</Text>
   );
   Trigger.Icon = () => null;
+  // The expo-router rule (NativeTabTrigger appendBadgeOptions): a value always shows, also
+  // with `hidden`. Only a badge with no value can hide.
   Trigger.Badge = ({
     hidden,
     children,
   }: {
     hidden?: boolean;
-    children: ReactNode;
-  }) => (hidden ? null : <Text testID="badge">{children}</Text>);
+    children?: ReactNode;
+  }) =>
+    children ? (
+      <Text testID="badge">{children}</Text>
+    ) : hidden ? null : (
+      <Text testID="badge"> </Text>
+    );
   const NativeTabs = ({ children }: { children: ReactNode }) => (
     <View>{children}</View>
   );

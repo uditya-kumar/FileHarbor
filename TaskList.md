@@ -424,6 +424,8 @@ needs them.
         ("3 downloading · 2 queued"). `useDownloadBadge()` gives the badge count.
       - The badge shows the files that download now, as in the design ("3" for
         "3 downloading · 2 queued"). It uses `accent` and `onAccent`. It hides at zero.
+        - Fix (device): the badge showed "0". expo-router ignores `hidden` when the badge
+          has a value. Now the badge has no value at zero. The test mock has the same rule.
       - 08: Download adds the selected files to the list and closes the selection. The hint
         "4 files download in parallel" is above the buttons. (Task 7.16: a file that is on
         the device already is added too. It only goes into the gallery.)
