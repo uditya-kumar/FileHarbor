@@ -11,6 +11,7 @@ import {
 } from "@components/fileHarbourComponent/viewer/ViewerActionRow";
 import { ViewerFileMeta } from "@components/fileHarbourComponent/viewer/ViewerFileMeta";
 import { ViewerFilmstrip } from "@components/fileHarbourComponent/viewer/ViewerFilmstrip";
+import { useMediaPermissions } from "@/hooks/useMediaPermissions";
 import { useVideoPlayback } from "@/hooks/useVideoPlayback";
 import { useViewer } from "@/hooks/useViewer";
 
@@ -18,7 +19,7 @@ import { useViewer } from "@/hooks/useViewer";
 // `messageId` the file that the user opened in 07. A tap shows or hides the bars.
 
 // The actions show disabled until they work. Share and Copy need a library that spec §2 does
-// not list; Save comes with the media library (7.16); Delete is a Telegram write (Phase 8).
+// not list; Delete is a Telegram write (Phase 8). Save works (7.16): it gets its onPress below.
 const ACTIONS: readonly ViewerAction[] = [
   { key: "share", icon: "share-2", label: "Share" },
   { key: "save", icon: "arrow-down-to-line", label: "Save" },
@@ -33,7 +34,21 @@ export default function ViewerScreen() {
     messageId: string;
   }>();
   const viewer = useViewer(folderId ?? "", Number(messageId));
+  const media = useMediaPermissions("Save");
   const open = viewer.open;
+  const save = viewer.save;
+  // Android asks for gallery access on the tap, not when the viewer opens.
+  const actions = ACTIONS.map((a) =>
+    a.key === "save" && save
+      ? {
+          ...a,
+          onPress: () =>
+            void media.ensureSave().then((ok) => {
+              if (ok) save();
+            }),
+        }
+      : a,
+  );
   const video = useVideoPlayback(
     open?.kind === "video" ? open.key : null,
     open?.videoUri ?? null,
@@ -85,10 +100,10 @@ export default function ViewerScreen() {
       ) : null}
 
       {chrome && open && viewer.status === "ready" ? (
-        <ViewerActionRow actions={ACTIONS}>
+        <ViewerActionRow actions={actions}>
           {open.kind === "video" ? (
             <VideoScrubber
-              bufferText={open.downloadText}
+              bufferText={media.notice ?? open.downloadText}
               played={video.played}
               elapsed={video.elapsed}
               total={video.total}
@@ -96,7 +111,10 @@ export default function ViewerScreen() {
             />
           ) : (
             <>
-              <ViewerFileMeta name={open.name} meta={open.meta} />
+              <ViewerFileMeta
+                name={open.name}
+                meta={media.notice ?? open.meta}
+              />
               <ViewerFilmstrip
                 items={viewer.strip}
                 activeKey={open.key}

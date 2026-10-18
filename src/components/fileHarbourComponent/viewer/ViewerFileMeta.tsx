@@ -24,8 +24,9 @@ export function ViewerFileMeta({ name, meta }: Props) {
       >
         {name}
       </Text>
+      {/* Two lines: a save notice can be longer than the date and size. */}
       <Text
-        numberOfLines={1}
+        numberOfLines={2}
         style={[styles.meta, { color: colors.viewerTextSecondary }]}
       >
         {meta}

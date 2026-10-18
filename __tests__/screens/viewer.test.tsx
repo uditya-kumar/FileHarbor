@@ -7,16 +7,40 @@ import {
 import type { ReactElement, Ref } from "react";
 
 import ViewerScreen from "@/app/viewer/[folderId]/[messageId]";
-import { loadFolderFiles, loadThumbnail, viewFile } from "@/index/sync";
-import type { FileProgress, FolderFile, ServiceError } from "@/types/domain";
+import {
+  fetchFile,
+  loadFolderFiles,
+  loadThumbnail,
+  viewFile,
+} from "@/index/sync";
+import {
+  getSaveAccess,
+  requestSaveAccess,
+  saveToGallery,
+} from "@/media/gallery";
+import { resetDownloadsForTests } from "@/transfer/downloads";
+import type {
+  FileProgress,
+  FolderFile,
+  ServiceError,
+  ServiceResult,
+} from "@/types/domain";
 
 import { mockParams, mockRouter, mockStack, resetAuthMocks } from "./authMocks";
 
 jest.mock("expo-router", () => require("./authMocks").expoRouterModule);
 jest.mock("@/index/sync", () => ({
+  fetchFile: jest.fn(),
   loadFolderFiles: jest.fn(),
   loadThumbnail: jest.fn(),
+  stopFile: jest.fn(async () => ({ ok: true, value: undefined })),
   viewFile: jest.fn(),
+  watchFiles: jest.fn(() => () => {}),
+}));
+jest.mock("@/media/gallery", () => ({
+  getSaveAccess: jest.fn(),
+  requestSaveAccess: jest.fn(),
+  saveToGallery: jest.fn(),
 }));
 jest.mock("expo-image", () => ({ Image: () => null }));
 jest.mock("expo-video", () => ({
@@ -73,6 +97,10 @@ const gallery = (): GalleryProps => {
 const load = loadFolderFiles as jest.Mock;
 const thumb = loadThumbnail as jest.Mock;
 const view = viewFile as jest.Mock;
+const fetch = fetchFile as jest.Mock;
+const getAccess = getSaveAccess as jest.Mock;
+const requestAccess = requestSaveAccess as jest.Mock;
+const saveFile = saveToGallery as jest.Mock;
 
 const MB = 1024 ** 2;
 const DATE = new Date(2024, 7, 12, 12).getTime() / 1000;
@@ -117,9 +145,22 @@ const download = () => {
   return { fileId: call[0], progress: call[1], error: call[2] };
 };
 const stop = jest.fn();
+/** The open fetchFile calls of the Downloads list. */
+const fetches = new Map<number, (r: ServiceResult<string>) => void>();
 
 beforeEach(() => {
   resetAuthMocks();
+  resetDownloadsForTests();
+  fetches.clear();
+  fetch.mockReset().mockImplementation(
+    (fileId: number) =>
+      new Promise<ServiceResult<string>>((resolve) => {
+        fetches.set(fileId, resolve);
+      }),
+  );
+  getAccess.mockReset().mockResolvedValue("granted");
+  requestAccess.mockReset().mockResolvedValue("granted");
+  saveFile.mockReset().mockResolvedValue({ ok: true, value: undefined });
   mockGallery.props = null;
   mockParams.current = { folderId: "Goa 2024", messageId: "5" };
   load.mockReset().mockResolvedValue({ ok: true, value: files });
@@ -212,8 +253,9 @@ describe("Viewer 09 — photo", () => {
   it("shows the actions disabled until they work", async () => {
     await render(<ViewerScreen />);
     await screen.findByText("IMG_5.HEIC");
-    for (const name of ["Share", "Save", "Copy", "Delete"])
+    for (const name of ["Share", "Copy", "Delete"])
       expect(screen.getByRole("button", { name })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Save" })).toBeEnabled();
   });
 
   it("shows a download error on the meta line", async () => {
@@ -225,6 +267,106 @@ describe("Viewer 09 — photo", () => {
     expect(
       screen.getByText("The file did not load (FILE_ID_INVALID)."),
     ).toBeOnTheScreen();
+  });
+});
+
+const pressSave = () =>
+  fireEvent.press(screen.getByRole("button", { name: "Save" }));
+
+describe("Viewer 09 — save", () => {
+  it("saves the open photo through the Downloads list, and shows the steps", async () => {
+    await render(<ViewerScreen />);
+    await screen.findByText("IMG_5.HEIC");
+    await pressSave();
+    // The app has access: Android shows no prompt.
+    expect(requestAccess).not.toHaveBeenCalled();
+    expect(fetch).toHaveBeenCalledWith(5);
+    expect(
+      screen.getByText("12 Aug 2024 · 8.4 MB · Saving…"),
+    ).toBeOnTheScreen();
+    expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
+
+    await act(() =>
+      download().progress({ downloaded: 42, size: 100, localUri: null }),
+    );
+    expect(
+      screen.getByText("12 Aug 2024 · 8.4 MB · Saving… 42%"),
+    ).toBeOnTheScreen();
+
+    await act(async () => {
+      fetches.get(5)?.({ ok: true, value: "file:///td/5.jpg" });
+    });
+    expect(saveFile).toHaveBeenCalledWith("file:///td/5.jpg", "IMG_5.HEIC", 5);
+    expect(
+      screen.getByText("12 Aug 2024 · 8.4 MB · Saved to the gallery"),
+    ).toBeOnTheScreen();
+    // A second save would put a copy in the gallery.
+    expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
+  });
+
+  it("keeps the save state of each page", async () => {
+    await render(<ViewerScreen />);
+    await screen.findByText("IMG_5.HEIC");
+    await pressSave();
+    await act(() => gallery().onIndexChange?.(2));
+    expect(screen.getByText("12 Aug 2024 · 8.4 MB")).toBeOnTheScreen();
+    expect(screen.getByRole("button", { name: "Save" })).toBeEnabled();
+    await act(() => gallery().onIndexChange?.(0));
+    expect(
+      screen.getByText("12 Aug 2024 · 8.4 MB · Saving…"),
+    ).toBeOnTheScreen();
+  });
+
+  it("shows a save error, and saves again on the next tap", async () => {
+    saveFile.mockResolvedValueOnce({
+      ok: false,
+      error: { kind: "failed", code: "ERR_SAVE" },
+    });
+    await render(<ViewerScreen />);
+    await screen.findByText("IMG_5.HEIC");
+    await pressSave();
+    await act(async () => {
+      fetches.get(5)?.({ ok: true, value: "file:///td/5.jpg" });
+    });
+    expect(
+      screen.getByText("Not saved (ERR_SAVE). Tap Save again."),
+    ).toBeOnTheScreen();
+
+    await pressSave();
+    await act(async () => {
+      fetches.get(5)?.({ ok: true, value: "file:///td/5.jpg" });
+    });
+    expect(saveFile).toHaveBeenCalledTimes(2);
+    expect(
+      screen.getByText("12 Aug 2024 · 8.4 MB · Saved to the gallery"),
+    ).toBeOnTheScreen();
+  });
+
+  it("does not save with no gallery access, and tells the user", async () => {
+    getAccess.mockResolvedValue("denied");
+    requestAccess.mockResolvedValue("denied");
+    await render(<ViewerScreen />);
+    await screen.findByText("IMG_5.HEIC");
+    await pressSave();
+    expect(fetch).not.toHaveBeenCalled();
+    expect(
+      screen.getByText(
+        "No access to the gallery. Tap Save again, then allow it.",
+      ),
+    ).toBeOnTheScreen();
+    expect(screen.getByRole("button", { name: "Save" })).toBeEnabled();
+  });
+
+  it("shows the save of a video on the line over the scrubber", async () => {
+    mockParams.current = { folderId: "Goa 2024", messageId: "4" };
+    await render(<ViewerScreen />);
+    await screen.findByText("Downloading · from Telegram");
+    await pressSave();
+    expect(screen.getByText("Saving…")).toBeOnTheScreen();
+    await act(async () => {
+      fetches.get(4)?.({ ok: true, value: "file:///td/4.mp4" });
+    });
+    expect(screen.getByText("Saved to the gallery")).toBeOnTheScreen();
   });
 });
 

@@ -8,6 +8,7 @@ import { Screen } from "@components/fileHarbourComponent/shared/Screen";
 import { SectionHeader } from "@components/fileHarbourComponent/shared/SectionHeader";
 import { TitleBlock } from "@components/fileHarbourComponent/shared/TitleBlock";
 import { useFolderContents } from "@/hooks/useFolderContents";
+import { useMediaPermissions } from "@/hooks/useMediaPermissions";
 import { useSelection } from "@/hooks/useSelection";
 import { addDownloads, MAX_PARALLEL_DOWNLOADS } from "@/transfer/downloads";
 
@@ -23,6 +24,7 @@ export default function FolderScreen() {
     folderId ?? "",
     selection.active ? selection.selected : null,
   );
+  const media = useMediaPermissions("Download");
   const picked = folder.selection;
   const notice = folder.notice;
   // flood_wait uses warn, never danger: red makes users retry (CLAUDE.md §6).
@@ -39,6 +41,15 @@ export default function FolderScreen() {
         ? { pathname: "/viewer/[folderId]/[messageId]", params }
         : { pathname: "/folders/[folderId]/[messageId]", params },
     );
+  };
+  // A photo or video goes into the gallery, so Android can ask for access first. A document
+  // only downloads. With no access the files stay selected: the user can try again.
+  const download = async (): Promise<void> => {
+    if (!picked) return;
+    const toGallery = picked.files.some((f) => f.kind !== "other");
+    if (toGallery && !(await media.ensureSave())) return;
+    addDownloads(picked.files);
+    selection.exit();
   };
   const longPressCell = (key: string): void => {
     if (selection.active) selection.toggle(key);
@@ -140,6 +151,9 @@ export default function FolderScreen() {
                   tone={rateLimited ? "warn" : "danger"}
                 />
               ) : null}
+              {picked && media.notice ? (
+                <Banner text={media.notice} icon="image" tone="warn" />
+              ) : null}
             </>
           }
         />
@@ -152,12 +166,7 @@ export default function FolderScreen() {
           downloadLabel={picked.downloadLabel}
           hint={`${MAX_PARALLEL_DOWNLOADS} files download in parallel`}
           onDownload={
-            picked.files.length > 0
-              ? () => {
-                  addDownloads(picked.files);
-                  selection.exit();
-                }
-              : undefined
+            picked.files.length > 0 ? () => void download() : undefined
           }
         />
       ) : null}

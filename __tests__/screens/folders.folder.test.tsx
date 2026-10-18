@@ -3,6 +3,7 @@ import type { ReactElement } from "react";
 
 import FolderScreen from "@/app/(tabs)/folders/[folderId]";
 import { loadFolderFiles, loadThumbnail, syncIndex } from "@/index/sync";
+import { getSaveAccess, requestSaveAccess } from "@/media/gallery";
 import { addDownloads } from "@/transfer/downloads";
 import type { FolderFile } from "@/types/domain";
 
@@ -13,6 +14,10 @@ jest.mock("@/index/sync", () => ({
   loadFolderFiles: jest.fn(),
   loadThumbnail: jest.fn(),
   syncIndex: jest.fn(),
+}));
+jest.mock("@/media/gallery", () => ({
+  getSaveAccess: jest.fn(),
+  requestSaveAccess: jest.fn(),
 }));
 jest.mock("@/transfer/downloads", () => ({
   addDownloads: jest.fn(),
@@ -25,6 +30,8 @@ const load = loadFolderFiles as jest.Mock;
 const thumb = loadThumbnail as jest.Mock;
 const sync = syncIndex as jest.Mock;
 const add = addDownloads as jest.Mock;
+const getAccess = getSaveAccess as jest.Mock;
+const requestAccess = requestSaveAccess as jest.Mock;
 
 const MB = 1024 ** 2;
 const file = (
@@ -64,6 +71,8 @@ beforeEach(() => {
   thumb.mockReset().mockResolvedValue({ ok: true, value: "file:///t.jpg" });
   sync.mockReset().mockResolvedValue({ ok: true, value: {} });
   add.mockReset().mockReturnValue(1);
+  getAccess.mockReset().mockResolvedValue("granted");
+  requestAccess.mockReset().mockResolvedValue("granted");
 });
 
 describe("Folder 07 — grid", () => {
@@ -189,6 +198,76 @@ describe("Folder 08 — multi-select", () => {
     );
     expect(mockStack.options.title).toBe("Beach");
     expect(screen.getByText("3 items · 6 MB")).toBeOnTheScreen();
+    // The app has gallery access: Android shows no prompt.
+    expect(requestAccess).not.toHaveBeenCalled();
+  });
+
+  it("asks for gallery access, and downloads when the user allows it", async () => {
+    getAccess.mockResolvedValue("undetermined");
+    await render(<FolderScreen />);
+    await screen.findByText("3 items · 6 MB");
+    await longPress("Photo, IMG_3.jpg");
+    await fireEvent.press(
+      screen.getByRole("button", { name: "Download 1 item" }),
+    );
+    expect(requestAccess).toHaveBeenCalledTimes(1);
+    expect(add).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the selection and tells the user when there is no gallery access", async () => {
+    getAccess.mockResolvedValue("denied");
+    requestAccess.mockResolvedValue("denied");
+    await render(<FolderScreen />);
+    await screen.findByText("3 items · 6 MB");
+    await longPress("Photo, IMG_3.jpg");
+    await fireEvent.press(
+      screen.getByRole("button", { name: "Download 1 item" }),
+    );
+    expect(add).not.toHaveBeenCalled();
+    expect(mockStack.options.title).toBe("1 selected");
+    expect(
+      screen.getByText(
+        "No access to the gallery. Tap Download again, then allow it.",
+      ),
+    ).toBeOnTheScreen();
+
+    // The user allows it on the second prompt.
+    requestAccess.mockResolvedValue("granted");
+    await fireEvent.press(
+      screen.getByRole("button", { name: "Download 1 item" }),
+    );
+    expect(add).toHaveBeenCalledTimes(1);
+    expect(mockStack.options.title).toBe("Beach");
+  });
+
+  it("sends the user to Android Settings when Android does not ask again", async () => {
+    getAccess.mockResolvedValue("blocked");
+    await render(<FolderScreen />);
+    await screen.findByText("3 items · 6 MB");
+    await longPress("Video, clip.mp4");
+    await fireEvent.press(
+      screen.getByRole("button", { name: "Download 1 item" }),
+    );
+    // Android shows no prompt again: the app does not ask.
+    expect(requestAccess).not.toHaveBeenCalled();
+    expect(add).not.toHaveBeenCalled();
+    expect(
+      screen.getByText(
+        "No access to the gallery. Allow it for FileHarbor in Android Settings.",
+      ),
+    ).toBeOnTheScreen();
+  });
+
+  it("downloads a document with no gallery access", async () => {
+    getAccess.mockResolvedValue("blocked");
+    await render(<FolderScreen />);
+    await screen.findByText("3 items · 6 MB");
+    await longPress("File, notes.pdf");
+    await fireEvent.press(
+      screen.getByRole("button", { name: "Download 1 item" }),
+    );
+    expect(getAccess).not.toHaveBeenCalled();
+    expect(add).toHaveBeenCalledTimes(1);
   });
 
   it("does not download with no file selected, and does not delete yet", async () => {

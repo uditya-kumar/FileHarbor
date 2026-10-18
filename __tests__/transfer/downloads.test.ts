@@ -1,4 +1,5 @@
 import { fetchFile, stopFile, watchFiles } from "@/index/sync";
+import { saveToGallery } from "@/media/gallery";
 import {
   addDownloads,
   getDownloads,
@@ -17,10 +18,12 @@ jest.mock("@/index/sync", () => ({
   stopFile: jest.fn(),
   watchFiles: jest.fn(),
 }));
+jest.mock("@/media/gallery", () => ({ saveToGallery: jest.fn() }));
 
 const fetch = fetchFile as jest.Mock;
 const stop = stopFile as jest.Mock;
 const watch = watchFiles as jest.Mock;
+const save = saveToGallery as jest.Mock;
 
 const MB = 1024 ** 2;
 const file = (fileId: number, over: Partial<FolderFile> = {}): FolderFile => ({
@@ -60,6 +63,7 @@ beforeEach(() => {
       }),
   );
   stop.mockResolvedValue({ ok: true, value: undefined });
+  save.mockResolvedValue({ ok: true, value: undefined });
   watch.mockImplementation((h: typeof push) => {
     push = h;
     return unwatch;
@@ -81,30 +85,108 @@ describe("downloads — queue", () => {
     expect(watch).toHaveBeenCalledTimes(1);
   });
 
-  it("does not add a file on the device or a file in the list", () => {
+  it("does not add a file in the list a second time", () => {
     addDownloads([file(1)]);
-    expect(
-      addDownloads([file(1), file(2, { localUri: "file:///td/2.jpg" })]),
-    ).toBe(0);
+    expect(addDownloads([file(1)])).toBe(0);
     expect(getDownloads()).toHaveLength(1);
     expect(isInDownloads(1)).toBe(true);
+  });
+
+  it("adds a file on the device too: it only goes into the gallery", async () => {
+    expect(addDownloads([file(2, { localUri: "file:///td/2.jpg" })])).toBe(1);
+    pending.get(2)?.({ ok: true, value: "file:///td/2.jpg" });
+    await flush();
+    expect(save).toHaveBeenCalledWith("file:///td/2.jpg", "IMG_2.jpg", 2);
     expect(isInDownloads(2)).toBe(false);
   });
 
-  it("takes a complete file out and starts the next one", async () => {
+  it("saves a complete file in the gallery, takes it out, and starts the next one", async () => {
     addDownloads([1, 2, 3, 4, 5].map((id) => file(id)));
     pending.get(2)?.({ ok: true, value: "file:///td/2.jpg" });
     await flush();
+    expect(save).toHaveBeenCalledWith("file:///td/2.jpg", "IMG_2.jpg", 2);
     expect(isInDownloads(2)).toBe(false);
     expect(fetch).toHaveBeenLastCalledWith(5);
     expect(statusOf()[5]).toBe("downloading");
   });
 
-  it("takes a file out when updateFile says it is complete (the viewer downloaded it)", () => {
+  it("shows saving while the gallery save runs, and it does not take a download place", async () => {
+    let finish: (r: ServiceResult<void>) => void = () => {};
+    save.mockImplementation(
+      () =>
+        new Promise<ServiceResult<void>>((resolve) => {
+          finish = resolve;
+        }),
+    );
+    addDownloads([1, 2, 3, 4, 5].map((id) => file(id)));
+    pending.get(1)?.({ ok: true, value: "file:///td/1.jpg" });
+    await flush();
+    expect(statusOf()[1]).toBe("saving");
+    expect(getDownloads()[0]?.downloaded).toBe(10 * MB);
+    expect(statusOf()[5]).toBe("downloading");
+    // A late updateFile does not change a file that saves.
+    push(1, { downloaded: 1 * MB, size: 10 * MB, localUri: null });
+    expect(getDownloads()[0]?.downloaded).toBe(10 * MB);
+    finish({ ok: true, value: undefined });
+    await flush();
+    expect(isInDownloads(1)).toBe(false);
+  });
+
+  it("keeps a file that did not save, with the save step, and saves it again", async () => {
+    save.mockResolvedValueOnce({
+      ok: false,
+      error: { kind: "failed", code: "ERR_SAVE" },
+    });
+    addDownloads([file(1)]);
+    pending.get(1)?.({ ok: true, value: "file:///td/1.jpg" });
+    await flush();
+    const failed = getDownloads()[0];
+    expect(failed?.status).toBe("failed");
+    expect(failed?.errorStep).toBe("save");
+    expect(failed?.error?.code).toBe("ERR_SAVE");
+
+    resumeDownload(1);
+    pending.get(1)?.({ ok: true, value: "file:///td/1.jpg" });
+    await flush();
+    expect(save).toHaveBeenCalledTimes(2);
+    expect(isInDownloads(1)).toBe(false);
+  });
+
+  it("does not put a document in the gallery: it stays in the TDLib cache", async () => {
+    addDownloads([file(1, { kind: "other", name: "Costs.xlsx" })]);
+    pending.get(1)?.({ ok: true, value: "file:///td/costs.xlsx" });
+    await flush();
+    expect(save).not.toHaveBeenCalled();
+    expect(isInDownloads(1)).toBe(false);
+  });
+
+  it("waits for the fetchFile result when updateFile says complete (the viewer downloaded it)", async () => {
     addDownloads([file(1), file(2)]);
     push(1, { downloaded: 10 * MB, size: 10 * MB, localUri: "file:///td/1" });
+    expect(isInDownloads(1)).toBe(true);
+    pending.get(1)?.({ ok: true, value: "file:///td/1" });
+    await flush();
     expect(isInDownloads(1)).toBe(false);
     expect(isInDownloads(2)).toBe(true);
+  });
+
+  it("ignores the save of a file that the user removed", async () => {
+    let finish: (r: ServiceResult<void>) => void = () => {};
+    save.mockImplementation(
+      () =>
+        new Promise<ServiceResult<void>>((resolve) => {
+          finish = resolve;
+        }),
+    );
+    addDownloads([file(1)]);
+    pending.get(1)?.({ ok: true, value: "file:///td/1.jpg" });
+    await flush();
+    removeDownloads([1]);
+    // A file that saves has no TDLib download to stop.
+    expect(stop).not.toHaveBeenCalled();
+    finish({ ok: false, error: { kind: "failed", code: "ERR_SAVE" } });
+    await flush();
+    expect(getDownloads()).toHaveLength(0);
   });
 
   it("stops watching updateFile when the list is empty", async () => {
@@ -125,6 +207,7 @@ describe("downloads — queue", () => {
     const failed = getDownloads().find((i) => i.fileId === 1);
     expect(failed?.status).toBe("failed");
     expect(failed?.error?.kind).toBe("rate_limited");
+    expect(failed?.errorStep).toBe("download");
     expect(statusOf()[5]).toBe("downloading");
   });
 });

@@ -1,9 +1,10 @@
-import { StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { Layout } from "@/constants/Layout";
 import { useColorScheme } from "@/hooks/useColorScheme";
 
 import { Button } from "@components/fileHarbourComponent/shared/Button";
+import { Checkbox } from "@components/fileHarbourComponent/shared/Checkbox";
 import {
   Icon,
   type IconName,
@@ -27,10 +28,17 @@ type Props = {
   actionLabel: string;
   /** Not set: the button shows disabled (a queued file). */
   onAction?: () => void;
+  /** 14: an accent card, and a check in place of the thumbnail. */
+  selected?: boolean;
+  /** A press on the file (not on the round button): toggles it in 14. */
+  onPress?: () => void;
+  /** Starts the 14 selection. */
+  onLongPress?: () => void;
 };
 
 // One file in the transfer lists (12, 13). Not ListRow: it has a thumbnail tile, a toned
-// status line, and a round action button, and ListRow has none of them.
+// status line, and a round action button, and ListRow has none of them. The file part and the
+// round button are two press targets, so TalkBack can reach both.
 export function TransferRow({
   name,
   detail,
@@ -42,6 +50,9 @@ export function TransferRow({
   actionIcon,
   actionLabel,
   onAction,
+  selected = false,
+  onPress,
+  onLongPress,
 }: Props) {
   const { colors } = useColorScheme();
   const image = thumbnailUri != null || placeholderUri != null;
@@ -50,48 +61,64 @@ export function TransferRow({
       ? colors.warn
       : detailTone === "danger"
         ? colors.danger
-        : colors.textTertiary;
+        : selected
+          ? colors.textSecondary
+          : colors.textTertiary;
 
   return (
     <View
       style={[
         styles.row,
-        { backgroundColor: colors.bg, borderColor: colors.border },
+        selected
+          ? { backgroundColor: colors.accentSoft, borderColor: colors.accent }
+          : { backgroundColor: colors.bg, borderColor: colors.border },
       ]}
     >
-      <View style={[styles.tile, { backgroundColor: colors.bgSunken }]}>
-        {image ? (
-          <Thumbnail
-            uri={thumbnailUri}
-            placeholderUri={placeholderUri}
-            recyclingKey={recyclingKey}
-          />
-        ) : (
-          <Icon
-            name={icon}
-            size={Layout.transfer.tileIcon}
-            color={colors.textTertiary}
-          />
-        )}
-      </View>
-      <View
-        style={styles.text}
-        accessible
+      <Pressable
+        style={styles.file}
+        onPress={onPress}
+        onLongPress={onLongPress}
+        disabled={!onPress && !onLongPress}
         accessibilityLabel={`${name}, ${detail}`}
+        accessibilityState={{ selected }}
       >
-        <Text
-          numberOfLines={1}
-          ellipsizeMode="middle"
-          style={[styles.name, { color: colors.textPrimary }]}
-        >
-          {name}
-        </Text>
-        <Text numberOfLines={1} style={[styles.detail, { color: detailColor }]}>
-          {detail}
-        </Text>
-      </View>
+        {selected ? (
+          <Checkbox checked />
+        ) : (
+          <View style={[styles.tile, { backgroundColor: colors.bgSunken }]}>
+            {image ? (
+              <Thumbnail
+                uri={thumbnailUri}
+                placeholderUri={placeholderUri}
+                recyclingKey={recyclingKey}
+              />
+            ) : (
+              <Icon
+                name={icon}
+                size={Layout.transfer.tileIcon}
+                color={colors.textTertiary}
+              />
+            )}
+          </View>
+        )}
+        <View style={styles.text}>
+          <Text
+            numberOfLines={1}
+            ellipsizeMode="middle"
+            style={[styles.name, { color: colors.textPrimary }]}
+          >
+            {name}
+          </Text>
+          <Text
+            numberOfLines={1}
+            style={[styles.detail, { color: detailColor }]}
+          >
+            {detail}
+          </Text>
+        </View>
+      </Pressable>
       <Button
-        variant="sunken"
+        variant={selected ? "raised" : "sunken"}
         size="round"
         icon={actionIcon}
         accessibilityLabel={actionLabel}
@@ -120,6 +147,12 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     alignItems: "center",
     justifyContent: "center",
+  },
+  file: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Layout.transfer.gap,
   },
   text: { flex: 1, gap: Layout.list.textGap },
   name: { fontSize: 14, fontWeight: "500" },

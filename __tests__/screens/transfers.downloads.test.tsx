@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen } from "@testing-library/react-native";
+import type { ReactElement } from "react";
 
 import DownloadsScreen from "@/app/(tabs)/transfers/downloads";
 import UploadsScreen from "@/app/(tabs)/transfers/uploads";
@@ -10,13 +11,16 @@ import {
 } from "@/transfer/downloads";
 import type { FolderFile, ServiceResult } from "@/types/domain";
 
-import { mockRouter, resetAuthMocks } from "./authMocks";
+import { mockRouter, mockStack, resetAuthMocks } from "./authMocks";
 
 jest.mock("expo-router", () => require("./authMocks").expoRouterModule);
 jest.mock("@/index/sync", () => ({
   fetchFile: jest.fn(),
   stopFile: jest.fn(),
   watchFiles: jest.fn(),
+}));
+jest.mock("@/media/gallery", () => ({
+  saveToGallery: jest.fn(async () => ({ ok: true, value: undefined })),
 }));
 jest.mock("expo-image", () => ({ Image: () => null }));
 
@@ -90,7 +94,12 @@ describe("Downloads 12 — list", () => {
     expect(
       screen.getByText("4 downloading · 1 queued · 1 paused"),
     ).toBeOnTheScreen();
-    expect(screen.getByText("4 files download in parallel")).toBeOnTheScreen();
+    expect(
+      screen.getByText(
+        "4 files download in parallel · Long-press a file to select it",
+      ),
+    ).toBeOnTheScreen();
+    expect(mockStack.options.title).toBe("Transfers");
     expect(screen.getByText("VID_0032.mp4")).toBeOnTheScreen();
     expect(screen.getByText("Queued · 1.2 MB")).toBeOnTheScreen();
     expect(screen.getByText("Paused · 0 B of 10 MB")).toBeOnTheScreen();
@@ -179,5 +188,102 @@ describe("Transfers switch", () => {
     expect(screen.getByRole("tab", { name: "Uploads" })).toBeSelected();
     await fireEvent.press(screen.getByRole("tab", { name: "Downloads" }));
     expect(mockRouter.replace).toHaveBeenLastCalledWith("/transfers/downloads");
+  });
+});
+
+type HeaderButton = ReactElement<{
+  accessibilityLabel: string;
+  disabled?: boolean;
+  onPress: () => void;
+}>;
+
+function headerButton(slot: "headerLeft" | "headerRight"): HeaderButton {
+  const make = mockStack.options[slot];
+  if (!make) throw new Error(`no ${slot}`);
+  return make() as HeaderButton;
+}
+
+/** The file part of a row: its label is "name, detail". */
+const fileOf = (name: string, detail: string) =>
+  screen.getByLabelText(`${name}, ${detail}`);
+
+async function longPress(name: string, detail: string): Promise<void> {
+  await act(async () => {
+    await fireEvent(fileOf(name, detail), "longPress");
+  });
+}
+
+describe("Downloads 14 — selection", () => {
+  it("starts with a long press, toggles with a press, and shows the count", async () => {
+    fill();
+    await render(<DownloadsScreen />);
+    // No selection: a press on the file does nothing.
+    await fireEvent.press(fileOf("VID_0032.mp4", "0 B of 10 MB"));
+    expect(mockStack.options.headerLeft).toBeUndefined();
+
+    await longPress("IMG_1.HEIC", "0 B of 10 MB");
+    await fireEvent.press(fileOf("VID_0032.mp4", "0 B of 10 MB"));
+    expect(mockStack.options.title).toBe("2 selected");
+    expect(screen.getByText("6 transfers · 2 selected")).toBeOnTheScreen();
+    expect(
+      screen.getByText(
+        "Tap to toggle · Remove stops the download. The file stays in Telegram.",
+      ),
+    ).toBeOnTheScreen();
+    expect(fileOf("IMG_1.HEIC", "0 B of 10 MB")).toBeSelected();
+    expect(fileOf("IMG_3.HEIC", "0 B of 10 MB")).not.toBeSelected();
+    expect(headerButton("headerLeft").props.accessibilityLabel).toBe(
+      "Close selection",
+    );
+
+    await fireEvent.press(fileOf("IMG_1.HEIC", "0 B of 10 MB"));
+    expect(mockStack.options.title).toBe("1 selected");
+    // The round button still works in selection.
+    await fireEvent.press(
+      screen.getByRole("button", { name: "Pause VID_0032.mp4" }),
+    );
+    expect(stop).toHaveBeenCalledWith(2);
+  });
+
+  it("removes the selected files from the list, and keeps the others", async () => {
+    fill();
+    await render(<DownloadsScreen />);
+    await longPress("IMG_1.HEIC", "0 B of 10 MB");
+    await fireEvent.press(fileOf("IMG_6.HEIC", "Paused · 0 B of 10 MB"));
+    const remove = headerButton("headerRight");
+    expect(remove.props.accessibilityLabel).toBe("Remove from Downloads");
+    await act(async () => remove.props.onPress());
+    // A file that downloads stops in TDLib. Nothing is deleted from Telegram.
+    expect(stop).toHaveBeenCalledWith(1);
+    expect(screen.queryByText("IMG_1.HEIC")).toBeNull();
+    expect(screen.queryByText("IMG_6.HEIC")).toBeNull();
+    expect(screen.getByText("4 downloading")).toBeOnTheScreen();
+    expect(mockStack.options.title).toBe("Transfers");
+  });
+
+  it("disables Remove with no file selected, and closes the selection", async () => {
+    fill();
+    await render(<DownloadsScreen />);
+    await longPress("IMG_1.HEIC", "0 B of 10 MB");
+    await fireEvent.press(fileOf("IMG_1.HEIC", "0 B of 10 MB"));
+    expect(mockStack.options.title).toBe("0 selected");
+    expect(headerButton("headerRight").props.disabled).toBe(true);
+    await act(async () => headerButton("headerLeft").props.onPress());
+    expect(mockStack.options.title).toBe("Transfers");
+    expect(
+      screen.getByText("4 downloading · 1 queued · 1 paused"),
+    ).toBeOnTheScreen();
+  });
+
+  it("leaves the selection when the last file completes", async () => {
+    addDownloads([file(1)]);
+    await render(<DownloadsScreen />);
+    await longPress("IMG_1.HEIC", "0 B of 10 MB");
+    expect(mockStack.options.title).toBe("1 selected");
+    await act(async () => {
+      pending.get(1)?.({ ok: true, value: "file:///td/1.heic" });
+    });
+    expect(screen.getByText("No downloads")).toBeOnTheScreen();
+    expect(mockStack.options.title).toBe("Transfers");
   });
 });

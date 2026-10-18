@@ -88,9 +88,14 @@ export type FileProgress = {
  * A file in the Downloads tab (12). "paused": the user stopped it; the parts on the device
  * stay. "failed": TDLib gave an error; the user can start it again.
  */
-export type DownloadStatus = "queued" | "downloading" | "paused" | "failed";
+/** "saving": the whole file is on the device, and it goes into the gallery now. */
+export type DownloadStatus =
+  "queued" | "downloading" | "saving" | "paused" | "failed";
 
-/** One file in the Downloads list. It leaves the list when the whole file is on the device. */
+/**
+ * One file in the Downloads list. It leaves the list when the whole file is on the device, and
+ * a photo or a video is in the gallery too.
+ */
 export type DownloadItem = {
   fileId: number;
   messageId: number;
@@ -108,7 +113,12 @@ export type DownloadItem = {
   bytesPerSecond: number | null;
   /** Set only when the status is "failed". */
   error: ServiceError | null;
+  /** The step that failed: the Telegram download, or the save in the gallery. */
+  errorStep: "download" | "save";
 };
+
+/** Access to the phone gallery. "blocked": Android does not show the prompt again. */
+export type MediaAccess = "granted" | "undetermined" | "denied" | "blocked";
 
 /** A folder on the device that the user picked to save a file in (sheet 11). */
 export type SaveFolder = {

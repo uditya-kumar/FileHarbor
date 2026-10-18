@@ -22,7 +22,9 @@ type Variant =
   | "viewer"
   | "viewerDestructive"
   /** A sunken circle in a row (12 pause and play). Disabled, its icon is tertiary. */
-  | "sunken";
+  | "sunken"
+  /** The same circle on an accent card (14 selected row): a bg circle. */
+  | "raised";
 /**
  * "pill": 52 high and fully round (08 action bar). With no label it is a 52 circle.
  * "round": a 36 circle for an icon only (12 transfer row).
@@ -105,8 +107,9 @@ function lookFor(
     case "viewerDestructive":
       return { fg: colors.viewerDanger, weight: "500" };
     case "sunken":
+    case "raised":
       return {
-        bg: colors.bgSunken,
+        bg: variant === "sunken" ? colors.bgSunken : colors.bg,
         fg: disabled ? colors.textTertiary : colors.textPrimary,
         weight: "500",
       };
@@ -130,7 +133,7 @@ export function Button({
   const look = lookFor(variant, colors, disabled);
   const ghost = variant === "ghost";
   // These variants show disabled with a colour, not with a lower opacity.
-  const tintDisabled = ghost || variant === "sunken";
+  const tintDisabled = ghost || variant === "sunken" || variant === "raised";
   const top = iconPosition === "top";
   // ghost, header, and the viewer variants have no box, so they ignore size.
   const bare =

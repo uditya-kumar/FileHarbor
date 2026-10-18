@@ -2,6 +2,7 @@ import { act, renderHook } from "@testing-library/react-native";
 
 import { useDownloadBadge, useDownloads } from "@/hooks/useDownloads";
 import { fetchFile, watchFiles } from "@/index/sync";
+import { saveToGallery } from "@/media/gallery";
 import {
   addDownloads,
   pauseDownload,
@@ -14,9 +15,11 @@ jest.mock("@/index/sync", () => ({
   stopFile: jest.fn(() => Promise.resolve({ ok: true, value: undefined })),
   watchFiles: jest.fn(),
 }));
+jest.mock("@/media/gallery", () => ({ saveToGallery: jest.fn() }));
 
 const fetch = fetchFile as jest.Mock;
 const watch = watchFiles as jest.Mock;
+const save = saveToGallery as jest.Mock;
 
 const MB = 1024 ** 2;
 const file = (fileId: number, size = 10 * MB): FolderFile => ({
@@ -47,6 +50,7 @@ beforeEach(() => {
         pending.set(fileId, resolve);
       }),
   );
+  save.mockReset().mockResolvedValue({ ok: true, value: undefined });
   watch.mockReset().mockImplementation((h: typeof push) => {
     push = h;
     return () => {};
@@ -85,7 +89,10 @@ describe("useDownloads", () => {
       jest.advanceTimersByTime(250);
     });
     expect(detail(1)).toBe("3.1 MB of 10 MB · 2.1 MB/s");
-    expect(result.current.hint).toBe("4 files download in parallel");
+    expect(result.current.hint).toBe(
+      "4 files download in parallel · Long-press a file to select it",
+    );
+    expect(result.current.selection).toBeNull();
   });
 
   it("shows a rate limit with warn tones and the wait time", async () => {
@@ -119,6 +126,36 @@ describe("useDownloads", () => {
       detailTone: "danger",
     });
   });
+
+  it("shows the gallery save, and a save that failed", async () => {
+    let finish: (r: ServiceResult<void>) => void = () => {};
+    save.mockImplementationOnce(
+      () =>
+        new Promise<ServiceResult<void>>((resolve) => {
+          finish = resolve;
+        }),
+    );
+    const { result } = await renderHook(() => useDownloads());
+    await act(async () => {
+      addDownloads([file(1), file(2)]);
+      pending.get(2)?.({ ok: true, value: "file:///td/2" });
+    });
+    // A file that saves comes after the files that download.
+    expect(result.current.rows.map((r) => r.fileId)).toEqual([1, 2]);
+    expect(result.current.rows[1]).toMatchObject({
+      status: "saving",
+      detail: "Saving to the gallery",
+      detailTone: "normal",
+    });
+    await act(async () => {
+      finish({ ok: false, error: { kind: "failed", code: "ERR_SAVE" } });
+    });
+    expect(result.current.rows[1]).toMatchObject({
+      status: "failed",
+      detail: "Not saved to the gallery (ERR_SAVE). Try again.",
+      detailTone: "danger",
+    });
+  });
 });
 
 describe("useDownloadBadge", () => {
@@ -138,5 +175,35 @@ describe("useDownloadBadge", () => {
       );
     });
     expect(result.current).toBe(0);
+  });
+});
+
+describe("useDownloads — selection (14)", () => {
+  it("counts the selected files that are still in the list", async () => {
+    let selected: ReadonlySet<string> = new Set(["1", "3"]);
+    const { result, rerender } = await renderHook(() => useDownloads(selected));
+    await act(() => {
+      addDownloads([1, 2, 3, 4, 5].map((id) => file(id)));
+    });
+    expect(result.current.selection).toMatchObject({
+      title: "2 selected",
+      summary: "5 transfers · 2 selected",
+      fileIds: [1, 3],
+    });
+    expect(result.current.rows.map((r) => r.selected)).toEqual([
+      true,
+      false,
+      true,
+      false,
+      false,
+    ]);
+    // File 3 completes: it leaves the list and the selection.
+    await act(async () => {
+      pending.get(3)?.({ ok: true, value: "file:///td/3" });
+    });
+    expect(result.current.selection?.summary).toBe("4 transfers · 1 selected");
+    selected = new Set();
+    await rerender({});
+    expect(result.current.selection?.title).toBe("0 selected");
   });
 });

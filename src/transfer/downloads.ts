@@ -1,11 +1,18 @@
 import { fetchFile, stopFile, watchFiles } from "@/index/sync";
-import type { DownloadItem, FileProgress, FolderFile } from "@/types/domain";
+import { saveToGallery } from "@/media/gallery";
+import type {
+  DownloadItem,
+  FileProgress,
+  FolderFile,
+  ServiceError,
+} from "@/types/domain";
 
 // The Downloads list (12): the files that the user asked for in 08. TDLib does the chunks, the
 // resume, and the retries (spec §4.3); this file only keeps the list, starts a few files at a
 // time, and reads the progress from updateFile (spec §8.6). The list is in memory: a TDLib
 // file id is valid in one TDLib instance only. After a restart, the parts on the device stay,
-// and a new download continues from them.
+// and a new download continues from them. A complete photo or video goes into the gallery (spec
+// §4.3). A document stays in the TDLib cache: sheet 11 saves it in a folder.
 
 /** Files that download at the same time (spec §8.4: 3–4 in parallel, TDLib runs them). */
 export const MAX_PARALLEL_DOWNLOADS = 4;
@@ -81,15 +88,9 @@ function speedOf(item: DownloadItem, downloaded: number): number | null {
 
 function onProgress(fileId: number, progress: FileProgress): void {
   const item = items.find((i) => i.fileId === fileId);
-  if (!item) return;
-  if (progress.localUri) {
-    // Complete, also when another screen (the viewer) downloaded it.
-    drop(fileId);
-    pump();
-    syncWatch();
-    emit();
-    return;
-  }
+  // The fetchFile result ends the download: it can still have the gallery save to do. A paused
+  // file that another screen (the viewer) completes saves when the user resumes it, at once.
+  if (!item || item.status === "saving") return;
   if (item.status !== "downloading") {
     if (progress.downloaded === item.downloaded) return;
     update(fileId, { downloaded: progress.downloaded });
@@ -108,21 +109,48 @@ function start(fileId: number): void {
   runs.set(fileId, run);
   samples.delete(fileId);
   update(fileId, { status: "downloading", error: null, bytesPerSecond: null });
-  void fetchFile(fileId).then((res) => {
+  void fetchFile(fileId).then(async (res) => {
     if (runs.get(fileId) !== run) return;
-    if (res.ok) drop(fileId);
-    else {
-      runs.delete(fileId);
-      update(fileId, {
-        status: "failed",
-        error: res.error,
-        bytesPerSecond: null,
-      });
+    const item = items.find((i) => i.fileId === fileId);
+    if (!res.ok || !item) {
+      if (!res.ok) fail(fileId, res.error, "download");
+      done();
+      return;
     }
+    if (item.kind === "other") {
+      drop(fileId);
+      done();
+      return;
+    }
+    // The save is a local copy, so it does not take a download place.
+    update(fileId, {
+      status: "saving",
+      downloaded: item.size || item.downloaded,
+      bytesPerSecond: null,
+    });
     pump();
-    syncWatch();
     emit();
+    const saved = await saveToGallery(res.value, item.name, fileId);
+    if (runs.get(fileId) !== run) return;
+    if (saved.ok) drop(fileId);
+    else fail(fileId, saved.error, "save");
+    done();
   });
+}
+
+function fail(
+  fileId: number,
+  error: ServiceError,
+  errorStep: DownloadItem["errorStep"],
+): void {
+  runs.delete(fileId);
+  update(fileId, { status: "failed", error, errorStep, bytesPerSecond: null });
+}
+
+function done(): void {
+  pump();
+  syncWatch();
+  emit();
 }
 
 /** Starts queued files, in list order, until MAX_PARALLEL_DOWNLOADS download. */
@@ -137,14 +165,14 @@ function pump(): void {
 }
 
 /**
- * Adds files to the end of the list. A file that is on the device or in the list already is
- * not added. Returns the number of files added.
+ * Adds files to the end of the list. A file that is in the list already is not added. A file
+ * that is on the device already only goes into the gallery. Returns the number of files added.
  */
 export function addDownloads(files: readonly FolderFile[]): number {
   const known = new Set(items.map((i) => i.fileId));
   const added: DownloadItem[] = [];
   for (const f of files) {
-    if (f.localUri || known.has(f.fileId)) continue;
+    if (known.has(f.fileId)) continue;
     known.add(f.fileId);
     added.push({
       fileId: f.fileId,
@@ -159,6 +187,7 @@ export function addDownloads(files: readonly FolderFile[]): number {
       downloaded: 0,
       bytesPerSecond: null,
       error: null,
+      errorStep: "download",
     });
   }
   if (added.length === 0) return 0;
@@ -190,7 +219,7 @@ export function resumeDownload(fileId: number): void {
   emit();
 }
 
-/** Stops the files and takes them out of the list (14 cancel). */
+/** Stops the files and takes them out of the list (14 remove). A save that runs ends. */
 export function removeDownloads(fileIds: readonly number[]): void {
   for (const fileId of fileIds) {
     const item = items.find((i) => i.fileId === fileId);

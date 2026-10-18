@@ -1,14 +1,25 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { formatBytes, formatDate } from "@/format/units";
+import { useDownloadItem } from "@/hooks/useDownloads";
 import { noticeFor } from "@/hooks/useFolderContents";
 import { loadFolderFiles, loadThumbnail, viewFile } from "@/index/sync";
-import { isInDownloads } from "@/transfer/downloads";
-import type { FileProgress, FolderFile, ServiceError } from "@/types/domain";
+import {
+  addDownloads,
+  isInDownloads,
+  resumeDownload,
+} from "@/transfer/downloads";
+import type {
+  DownloadItem,
+  FileProgress,
+  FolderFile,
+  ServiceError,
+} from "@/types/domain";
 
 // Screen state for the viewer (09 photo, 10 video). It pages through the photos and videos of
 // one folder, in the 07 order. The open file downloads at the highest priority; the pages near
-// it show their thumbnails until then (spec §8.1).
+// it show their thumbnails until then (spec §8.1). Save puts the open file in the Downloads
+// list, the same path as the 08 Download: the list saves it in the gallery (task 7.16).
 
 export type ViewerPageData = {
   /** The message id as a string. */
@@ -32,15 +43,25 @@ export type ViewerOpen = {
   key: string;
   kind: "photo" | "video";
   name: string;
-  /** 09 "12 Aug 2024 · 8.4 MB", with the download progress while the full photo loads. */
+  /**
+   * 09 "12 Aug 2024 · 8.4 MB", with the download progress while the full photo loads, or the
+   * save state ("… · Saving… 42%", "… · Saved to the gallery").
+   */
   meta: string;
   /** The video poster (10). */
   posterUri: string | null;
   /** The video file, when the whole file is on the device. null for a photo. */
   videoUri: string | null;
-  /** 10 line over the scrubber while the video downloads. */
+  /** 10 line over the scrubber while the video downloads or saves. */
   downloadText?: string;
 };
+
+/** The open file in the gallery save: not asked, in the Downloads list, done, or failed. */
+type SaveState =
+  | { step: "none" }
+  | { step: "saving" | "paused"; item: DownloadItem }
+  | { step: "failed"; item: DownloadItem }
+  | { step: "saved" };
 
 export type ViewerStatus =
   | "loading"
@@ -65,6 +86,35 @@ function noticeText(error: ServiceError): string {
   return error.kind === "failed"
     ? `The file did not load (${error.code}).`
     : noticeFor(error).text;
+}
+
+function saveStateOf(item: DownloadItem | null, asked: boolean): SaveState {
+  if (item?.status === "failed") return { step: "failed", item };
+  if (item?.status === "paused") return { step: "paused", item };
+  if (item) return { step: "saving", item };
+  // A file that leaves the list with no error is in the gallery.
+  return asked ? { step: "saved" } : { step: "none" };
+}
+
+/** The save line, or null when the user did not save the file. */
+function saveText(save: SaveState, percent: number | null): string | null {
+  switch (save.step) {
+    case "none":
+      return null;
+    case "saved":
+      return "Saved to the gallery";
+    case "paused":
+      return "Paused in Downloads";
+    case "saving":
+      return percent !== null && save.item.status === "downloading"
+        ? `Saving… ${percent}%`
+        : "Saving…";
+    case "failed": {
+      const error = save.item.error;
+      if (error?.kind === "rate_limited") return noticeFor(error).text;
+      return `Not saved (${error?.code ?? "UNKNOWN"}). Tap Save again.`;
+    }
+  }
 }
 
 function labelOf(f: ViewerMedia): string {
@@ -92,6 +142,10 @@ export function useViewer(dirPath: string, messageId: number) {
     progress: FileProgress | null;
     error: ServiceError | null;
   } | null>(null);
+  /** Files that the user saved from this viewer: file ids. */
+  const [saveAsked, setSaveAsked] = useState<ReadonlySet<number>>(
+    () => new Set(),
+  );
   const [chromeVisible, setChromeVisible] = useState(true);
   const mounted = useRef(true);
   const requested = useRef(new Set<number>());
@@ -170,6 +224,11 @@ export function useViewer(dirPath: string, messageId: number) {
     // openDone is read once per file: a file that completes keeps its URI in `local`.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openId, openFileId]);
+  const openItem = useDownloadItem(openFileId ?? null);
+  const save = saveStateOf(
+    openItem,
+    openFileId != null && saveAsked.has(openFileId),
+  );
   const current = download?.fileId === openFileId ? download : null;
   const progress = current?.progress ?? null;
   const fileError = current?.error ?? null;
@@ -212,22 +271,45 @@ export function useViewer(dirPath: string, messageId: number) {
   let openInfo: ViewerOpen | null = null;
   if (open) {
     const uri = localOf(open);
-    const downloading =
-      !uri && progress ? `Downloading ${percentOf(progress)}%` : null;
+    const percent = !uri && progress ? percentOf(progress) : null;
+    const downloading = percent !== null ? `Downloading ${percent}%` : null;
+    const saving = saveText(save, percent);
     const base = `${formatDate(open.date)} · ${formatBytes(open.size)}`;
+    // A save error is long: it takes the whole line.
+    let meta = base;
+    if (saving) meta = save.step === "failed" ? saving : `${base} · ${saving}`;
+    else if (downloading) meta = `${base} · ${downloading}`;
     openInfo = {
       key: String(open.messageId),
       kind: open.kind,
       name: open.name,
-      meta: notice ?? (downloading ? `${base} · ${downloading}` : base),
+      meta: notice ?? meta,
       posterUri: thumbOf(open),
       videoUri: open.kind === "video" ? uri : null,
       downloadText:
-        open.kind === "video" && !uri
-          ? (notice ?? `${downloading ?? "Downloading"} · from Telegram`)
-          : undefined,
+        open.kind !== "video"
+          ? undefined
+          : (notice ??
+            saving ??
+            (uri
+              ? undefined
+              : `${downloading ?? "Downloading"} · from Telegram`)),
     };
   }
+
+  /**
+   * Saves the open file in the gallery. null: the file saves now or is saved (Save shows
+   * disabled). A paused or failed file starts again in the Downloads list.
+   */
+  const saveOpen =
+    open &&
+    (save.step === "none" || save.step === "paused" || save.step === "failed")
+      ? (): void => {
+          setSaveAsked((prev) => new Set(prev).add(open.fileId));
+          if (save.step === "none") addDownloads([open]);
+          else resumeDownload(open.fileId);
+        }
+      : null;
 
   const status: ViewerStatus = loadError
     ? "error"
@@ -257,6 +339,7 @@ export function useViewer(dirPath: string, messageId: number) {
     open: openInfo,
     setIndex,
     select,
+    save: saveOpen,
     chromeVisible,
     toggleChrome: useCallback(() => setChromeVisible((v) => !v), []),
   };

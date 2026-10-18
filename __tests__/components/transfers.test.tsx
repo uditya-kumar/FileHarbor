@@ -82,3 +82,38 @@ describe("TransferRow", () => {
     expect(detailColor(base.detail)).toBe(Colors.light.textTertiary);
   });
 });
+
+describe("TransferRow — selected (14)", () => {
+  it("shows the check in place of the thumbnail, and takes the press", async () => {
+    const onPress = jest.fn();
+    const onLongPress = jest.fn();
+    await render(
+      <TransferRow
+        {...base}
+        thumbnailUri="file:///t/70.jpg"
+        onAction={jest.fn()}
+        selected
+        onPress={onPress}
+        onLongPress={onLongPress}
+      />,
+    );
+    const row = screen.getByLabelText(`${base.name}, ${base.detail}`);
+    expect(row).toBeSelected();
+    expect(mockImage).not.toHaveBeenCalled();
+    const detail = StyleSheet.flatten(
+      screen.getByText(base.detail).props.style,
+    );
+    expect(detail.color).toBe(Colors.light.textSecondary);
+    await fireEvent.press(row);
+    await fireEvent(row, "longPress");
+    expect(onPress).toHaveBeenCalledTimes(1);
+    expect(onLongPress).toHaveBeenCalledTimes(1);
+  });
+
+  it("is not selected by default", async () => {
+    await render(<TransferRow {...base} onPress={jest.fn()} />);
+    expect(
+      screen.getByLabelText(`${base.name}, ${base.detail}`),
+    ).not.toBeSelected();
+  });
+});

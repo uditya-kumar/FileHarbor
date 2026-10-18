@@ -336,7 +336,7 @@ needs them.
       - The four actions show disabled:
         - Share and Copy need a library (for example `expo-sharing`, `expo-clipboard`). Spec §2
           does not list them. ❓ Ask the user.
-        - Save comes with the media library (task 7.16).
+        - Save comes with the media library (task 7.16). Done: see task 7.16.
         - Delete is a Telegram write (Phase 8).
       - The Info and More header icons are not there. They come when they have a function.
       - An error shows on the meta line (photo) or the download line (video). A rate limit shows
@@ -425,8 +425,8 @@ needs them.
       - The badge shows the files that download now, as in the design ("3" for
         "3 downloading · 2 queued"). It uses `accent` and `onAccent`. It hides at zero.
       - 08: Download adds the selected files to the list and closes the selection. The hint
-        "4 files download in parallel" is above the buttons. A file that is on the device
-        already is not added (task 7.16 saves it to the gallery).
+        "4 files download in parallel" is above the buttons. (Task 7.16: a file that is on
+        the device already is added too. It only goes into the gallery.)
       - Open:
         - The list is not kept after an app restart. A TDLib file id is valid in one TDLib
           instance only. The parts on the device stay.
@@ -466,8 +466,70 @@ needs them.
 
       - Empty state: "No downloads" with a short help text. Design.pen has no frame for it.
       - Open: 📱 compare 12 with Design.pen in light.
-- [ ] 7.15 Write screen 14 (selection mode in screen 12). Do the screen checks.
-- [ ] 7.16 Write `src/hooks/useMediaPermissions.ts`. Save downloads with `expo-media-library`.
+- [x] 7.15 Write screen 14 (selection mode in screen 12). Do the screen checks.
+       Status: done. tsc, lint, and jest pass (372 tests). The audits are clean.
+      - A long press on a file starts the selection. Then a tap on a file toggles it. The round
+        button (pause, resume, try again) still works in the selection.
+      - The header: the title is "2 selected", the left button is Close (x), and the right
+        button is "Remove from Downloads" (trash). Remove is disabled with 0 selected.
+      - Decision: the 14 design shows Delete. Delete removes the file from Telegram. That is a
+        Telegram write, so it waits for Phase 8. In its place, Remove stops the download in
+        TDLib and takes the file out of the list. The file stays in Telegram.
+      - The summary is "6 transfers · 2 selected". The sub line is
+        "Tap to toggle · Remove stops the download. The file stays in Telegram."
+      - The 12 sub line is now "4 files download in parallel · Long-press a file to select it".
+      - The selection closes when the list is empty (for example, the last file completes).
+      - `TransferRow` has `selected`, `onPress`, and `onLongPress`. A selected row has an
+        `accentSoft` card, an `accent` border, and a checkbox in place of the tile. The file
+        part and the round button are two press targets, so TalkBack can get to the two.
+      - New `Button` variant `raised` (the round button on a selected row: `bg`, not
+        `bgSunken`).
+      - Reason for no new component: `TransferRow` plus props does 14.
+      - Open: 📱 compare 14 with Design.pen in light.
+- [x] 7.16 Write `src/hooks/useMediaPermissions.ts`. Save downloads with `expo-media-library`.
+       Status: done. tsc, lint, and jest pass (395 tests). The audits are clean.
+      - New `src/media/gallery.ts`: `getSaveAccess`, `requestSaveAccess`, and `saveToGallery`.
+        It uses the new expo-media-library API (`Asset.create`), not `legacy`.
+      - Access is write-only, for photos and videos. On Android 11+ a save needs no runtime
+        permission, so the user usually sees no prompt.
+      - `useMediaPermissions()` gives `access`, `notice`, and `ensureSave()`.
+        - 08 Download calls `ensureSave()` only when a selected file is a photo or a video.
+        - With no access, the files stay selected and a `warn` banner shows:
+          - denied: "No access to the gallery. Tap Download again, then allow it.";
+          - blocked (Android does not ask again): "No access to the gallery. Allow it for
+            FileHarbor in Android Settings."
+      - The download flow: download → "Saving to the gallery" → out of the list.
+        - The save does not take one of the 4 download places. The badge counts only the
+          files that download.
+        - A save error stays in the list: "Not saved to the gallery (CODE). Try again." A
+          retry saves again. The file is on the device already, so it does not download again.
+      - The gallery name is the caption name. TDLib can give a cache file another name (for
+        example "IMG_4821_1.HEIC"). Then the app copies the file to
+        `cache/gallery/<fileId>/<name>` first, and deletes the copy after the save.
+      - A document ("other" kind) does not go into the gallery: Android does not let it. It
+        stays in the TDLib cache. Sheet 11 saves it to a folder.
+      - A file on the device already is now added to the list. It saves at once.
+      - Viewer Save (09, 10), by user request. It puts the open file in the Downloads list,
+        the same path as 08 Download. It asks for gallery access on the tap.
+        - The 09 meta line shows the steps: "12 Aug 2024 · 8.4 MB · Saving… 42%", then
+          "… · Saved to the gallery". On 10 the line over the scrubber shows them.
+        - A save error: "Not saved (CODE). Tap Save again." A paused file: "Paused in
+          Downloads". A tap on Save starts the two again.
+        - Save is disabled while the file saves, and after it is saved. A second save makes a
+          second copy in the gallery.
+        - "Saved" is kept for each page while the viewer is open. It is not kept after the
+          viewer closes.
+        - New `useDownloadItem(fileId)` in `useDownloads.ts`: the Downloads item of one file.
+        - The 09 meta line can have 2 lines now, for the long notices.
+      - Tests: `jest.setup.ts` mocks `expo-media-library` (it has no native module in Jest).
+        New `__tests__/media/gallery.test.ts`.
+      - Open:
+        - 📱 Make sure that the write-only request gives "granted" with no prompt on
+          Android 15, and that a downloaded photo and video show in the gallery (DCIM), with the
+          caption name.
+        - The `expo-media-library` config plugin is not in `app.config.ts`. The permissions
+          in the manifest come from the library. Add the plugin only if a prompt text is
+          necessary (it needs a rebuild).
 - [ ] 7.17 📱 Download the 51.8 MB video. Make sure that its SHA-256 is correct.
 - [ ] 7.18 📱 Make sure that `expo-image` shows a `.heic` file from a TDLib path (spec §12.2).
 
