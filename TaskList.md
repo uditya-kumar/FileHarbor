@@ -258,12 +258,13 @@ needs them.
       only when its cell is on screen.
 - [x] 7.5 Write `gallery/GalleryGrid.tsx` and `gallery/GridCell.tsx` (FlashList v2, 3 columns).
       Why not `shared/`: only the folder screen shows a square media grid.
-- [ ] 7.6 Write screen 07 `folders/[folderId]/index.tsx`. Do the screen checks.
+- [x] 7.6 Write screen 07 `folders/[folderId]/index.tsx`. Do the screen checks.
       Status: the screen, the 04 row press, and the tests are done. tsc, lint, and jest pass.
       The audits are clean. Open:
       - Result (2026-10-10, device, dark): the grid shows the Shaadi photo with its
         thumbnail. Thus `onViewableItemsChanged` starts the thumbnail download.
       - Compare to frame 07 in light (dark is checked on the device).
+        ✅ Done (2026-10-19, user): light is correct.
       Differences from frame 07, by decision:
       - The video badge shows the play icon only. A document has no video length.
       - The Select header action is done (task 7.8). The More menu comes with the folder
@@ -272,7 +273,7 @@ needs them.
       - Subfolders do not show. The app makes root folders only.
 - [x] 7.7 Write `src/hooks/useSelection.ts` and `shared/Checkbox.tsx`.
       Selection is in UI state only (spec §8.4). Android back closes the selection first.
-- [ ] 7.8 Write screen 08 (multi-select in screen 07) and `gallery/SelectionToolbar.tsx`.
+- [x] 7.8 Write screen 08 (multi-select in screen 07) and `gallery/SelectionToolbar.tsx`.
       Do the screen checks.
       Status: the code and the tests are done. tsc, lint, and jest pass (255 tests). The audits
       are clean. A long press or the Select header button starts the selection. A press
@@ -284,7 +285,9 @@ needs them.
         the selected ring and tick, "Download 1 item", and the disabled bar are correct.
         Fix (user): the close icon touched the title. `Button headerLeading` adds the 08 gap
         (22, `Layout.header.leadingGap`). 📱 Check it on the device.
+      - 📱 Device test (2026-10-19, user): multi-select in a folder works correctly.
       - Compare to frame 08 in light (dark is checked on the device).
+        ✅ Done (2026-10-19, user): light is correct.
       - Download is connected (task 7.12), with the hint "4 files download in parallel".
       - Delete is disabled. It is a Telegram write, so it comes with the trash (Phase 8).
 - [x] 7.9 Write the viewer components: `PhotoViewer`, `VideoViewer`, `ViewerFileMeta`,
@@ -296,6 +299,7 @@ needs them.
         worklets 0.10.1.
       - 📱 The gallery is not verified with Reanimated 4 and bridgeless (spec §12.4). Do a
         swipe, pinch, and double-tap check on a device in task 7.10.
+        ✅ Done (2026-10-19, user): swipe, pinch, and double-tap zoom work correctly.
       - The pager fills the screen. The header (transparent) and `ViewerActionRow` sit on top
         of it, so a tap can hide them.
       - A video page shows its poster. On the open page, `PhotoViewer` shows the `video` slot.
@@ -532,19 +536,113 @@ needs them.
         - The `expo-media-library` config plugin is not in `app.config.ts`. The permissions
           in the manifest come from the library. Add the plugin only if a prompt text is
           necessary (it needs a rebuild).
-- [ ] 7.17 📱 Download the 51.8 MB video. Make sure that its SHA-256 is correct.
-- [ ] 7.18 📱 Make sure that `expo-image` shows a `.heic` file from a TDLib path (spec §12.2).
+- [x] 7.17 📱 Download the 51.8 MB video. Make sure that its SHA-256 is correct.
+      Status: done with a 13.2 MB video. ✅ (2026-10-19)
+      - The user sent `paseo_2026-10-18_14-21-00.mp4` (13 178 542 bytes) to Saved Messages
+        with the caption `fileharbor:1:{"path":["Test"],"name":"video-51.mp4"}`. The app
+        showed it in the folder "Test". The user downloaded it in 08.
+      - The SHA-256 is the same in the three places:
+        `67bfc949b595baa72a8367c356d26cc4302c61eea90bc2263efcb516f7652bd8`:
+        - the original on the PC (`certutil -hashfile … SHA256`);
+        - the TDLib file (`run-as com.fileharbor.app sha256sum files/tdlib/documents/…`);
+        - the gallery copy `/sdcard/DCIM/video-51.mp4`. It has the caption name.
+      - The first check: `IMG_0001.jpg` (109 235 bytes). The TDLib file and the gallery copy
+        have the same SHA-256. The gallery name is the caption name, not the TDLib cache name.
+      - Open: the 51.8 MB file itself is not checked. It is an old web-app upload. Do the
+        same check on a large file in the step 5 round trip (upload, then download).
+      - A gallery video goes into `DCIM/`, not `Movies/` (the expo-media-library default).
+- [x] 7.18 📱 Make sure that `expo-image` shows a `.heic` file from a TDLib path (spec §12.2).
+      Status: done. ✅ (2026-10-19, Android 15, dark)
+      - The viewer (09) showed `IMG_0002.heic` (2.1 MB) sharp, at full size. The user and an
+        adb screenshot confirm it.
+      - logcat: Glide loaded
+        `file:///data/data/com.fileharbor.app/files/tdlib/documents/IMG20261003131326.heic`
+        directly from the TDLib path. No error. No conversion step is necessary.
+      - Spec §12.2 "HEIC ✓ Android" is now verified on this device.
 
 ## Phase 8 — Write path: one file (spec §11 step 5)
 
-- [ ] 8.1 Make sure that Phase 5 is complete. Do not start this phase before.
-- [ ] 8.2 Write `src/media/thumbnail.ts` (320 px thumbnail) and `src/media/hash.ts` (SHA-256).
-- [ ] 8.3 Write `src/telegram/upload.ts`: raw `sendMessage` with `inputMessageDocument`,
+- [x] 8.1 Make sure that Phase 5 is complete. Do not start this phase before.
+      Status: done. Phase 5 has no open task. The user approved caption v1.
+- [x] 8.2 Write `src/media/thumbnail.ts` (320 px thumbnail) and `src/media/hash.ts` (SHA-256).
+      Status: done. tsc, lint, and jest pass. The audits are clean.
+      - `hash.ts`: expo-crypto 57 hashes one buffer only. It has no streaming API (SDK 57
+        docs). A file up to 64 MB goes to `digest` at once (native). A larger file goes to an
+        incremental JS SHA-256 (FIPS 180-4) in 4 MB parts, so the memory does not grow.
+        The tests compare it with Node's crypto: the FIPS vectors, each length near the
+        padding edge, any split, and the two file paths. Not used yet: the dedupe is Phase 9.
+        📱 Measure the JS speed on the device with a large video (Phase 9).
+      - `thumbnail.ts`: a JPEG (quality 0.8) of at most 320 px on the longest side, with the
+        same ratio. A video uses the frame at 1 s (0 s for a shorter video). A document has
+        no thumbnail. A failed thumbnail does not stop the upload.
+- [x] 8.3 Write `src/telegram/upload.ts`: raw `sendMessage` with `inputMessageDocument`,
       `disable_content_type_detection: true`. Do not `await` the send (spec §4.2).
-- [ ] 8.4 📱 Find what `inputFileLocal` accepts on Android (spec §12.3).
-- [ ] 8.5 📱 Upload one file with the correct caption.
-- [ ] 8.6 📱 Check the caption in Telegram. Clear the app data, sync, and make sure that the file
+      Status: done. tsc, lint, and jest pass (433 tests). The audits are clean.
+      - `sendDocument` uses `sendMessageTracked` (client.ts). The pending message is matched
+        by chat and caption. `localPathOf` gives the plain path for `inputFileLocal`, and
+        null for `content://`.
+      - `src/transfer/queue.ts` `uploadFile`: the caption (serialiseCaption), a check that
+        the same caption does not send two times at once, the thumbnail, the send, the
+        progress from `updateFile` (`remote.uploaded_size`), then a full sync. After a
+        success it deletes the picker copy and the thumbnail. After a failure it keeps the
+        copy. Phase 9 makes it a persistent queue.
+      - `src/media/picker.ts`: one photo or video with `expo-image-picker`, quality 1, no
+        editing. The native code (57) uses `RawImageExporter` / `copyFile`: a byte copy in
+        the app cache, no re-encode.
+      - 07: the upload button from Design.pen (`pTI9T`): a 52 pill with `plus`, at the end
+        of a bar under the grid, with an accent shadow (new token `accentShadow`). It shows
+        in the grid and in an empty folder, not during a selection. It is off while a file
+        uploads. A banner shows "Uploading IMG_9.jpg · 1.5 MB of 4 MB", then
+        "IMG_9.jpg is uploaded.". A rate limit uses warn tones.
+      - New: `useUpload` (Phase 9 replaces it with `useUploadQueue`),
+        `gallery/UploadButton.tsx` (reason: the pill Button plus the 07 bar layout and
+        shadow; only 07 has it), `reload()` in `useFolderContents`, the icons `plus` and
+        `upload`, `TdFile.remote`.
+      - The APK on the device has the five native modules (checked in the dex). A JS reload
+        is sufficient.
+- [x] 8.4 📱 Find what `inputFileLocal` accepts on Android (spec §12.3).
+      Status: done (2026-10-21). `inputFileLocal` reads the plain path of the picker copy in
+      the app cache (`/data/user/0/com.fileharbor.app/cache/ImagePicker/…`). `content://` is
+      not sent: `localPathOf` gives null for it. A path in shared storage (spec §6 order 2,
+      bulk) is not checked yet: Phase 10.
+- [x] 8.5 📱 Upload one file with the correct caption.
+      Status: done (2026-10-21, user). A 7.4 MB video went to Saved Messages as a document,
+      with `fileharbor:1:{"path":["Test"],"name":"1000159075.mp4"}`. It showed in "Test".
+      - Bug: the name. The real file is `Documents/graphify_2026-10-21_10-38-31.mp4`. The
+        Android photo picker gives a picker URI, and its DISPLAY_NAME is the media id.
+        `expo-image-picker` copies that name to `fileName`. Fix: task 8.7.
+      - The original SHA-256: `aea35cff…e4b2c0` (7 414 993 bytes). 📱 Compare it with the
+        downloaded copy.
+- [x] 8.6 📱 Check the caption in Telegram. Clear the app data, sync, and make sure that the file
       shows in the correct folder with the correct name.
+      Status: done (2026-10-21, user). The caption in Telegram is correct (v1, the folder
+      "Test"). After a clear of the app data and a new log-in, the sync put the file in
+      "Test" with the caption name. The captions are the only record of the tree: confirmed.
+- [x] 8.7 Give the upload the real file name, not the picker's media id (bug from 8.5).
+      Status: the code and the tests are done. tsc, lint, and jest pass (440 tests). 📱 Open.
+      - User decision: ask for read access to photos and videos. A denied access still
+        uploads, with the picker name.
+      - 07: before the picker opens, `useMediaPermissions().ensureRead()` asks one time
+        (granular photo + video, not write-only). Then the picker opens.
+      - `picker.ts`: the media id is `assetId`, or the digits of a "1000159075.mp4" name.
+        `gallery.ts` `mediaFileName` reads the real name with
+        `new Asset("content://media/external/{video|images}/media/<id>").getFilename()`.
+        adb confirmed that this URI gives `graphify_2026-10-21_10-38-31.mp4`.
+      - With "Select photos" (Android 14+), an item outside the selection keeps the picker name.
+      - The APK declares READ_MEDIA_IMAGES and READ_MEDIA_VIDEO. A JS reload is sufficient.
+      - 📱 Done (2026-10-21, user): "Allow all", then an upload of
+        `Documents/graphify-readme-9x16.png` (1 149 162 bytes). The caption is
+        `fileharbor:1:{"path":["Test"],"name":"graphify-readme-9x16.png"}`: the real name.
+      - 📱 Round trip ✅ (2026-10-21): upload, then download in 08. The SHA-256 is the same in
+        the three places, `cb0714815d1512fe627e22a4507fcfd0b589b69b9a8aa4a4aa7f0ad241818485`:
+        the original (`Documents/graphify-readme-9x16.png`), the TDLib download, and the
+        gallery copy (`DCIM/graphify-readme-9x16.png`). The upload is byte-exact: the picker
+        copy, `inputFileLocal`, and `disable_content_type_detection` change nothing.
+      - Found: the Telegram document `file_name` is the picker cache name
+        (`8abb7dce-….png`), because TDLib uses the name of the local file. The app shows the
+        caption name (spec §1), but the Telegram app and an export show the cache name.
+        Fix in Phase 9: give the copy the caption name before the send.
+      - Open: the 7.4 MB video (`1000159075.mp4`, original `aea35cff…e4b2c0`) is not checked.
 
 ## Phase 9 — Persistent upload queue (spec §11 step 6)
 

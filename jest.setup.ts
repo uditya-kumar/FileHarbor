@@ -25,7 +25,7 @@ jest.mock("@shopify/flash-list/dist/recyclerview/utils/measureLayout", () => {
 });
 
 // expo-media-library has no native module in Jest: its classes cannot load. The default is a
-// granted write access and a save that works. A test sets other results on these mocks.
+// granted access and a save that works. A test sets other results on these mocks.
 jest.mock("expo-media-library", () => {
   const granted = {
     granted: true,
@@ -33,8 +33,16 @@ jest.mock("expo-media-library", () => {
     canAskAgain: true,
     expires: "never",
   };
+  // A class: `new Asset(contentUri)` reads one item (the upload file name).
+  const Asset = Object.assign(
+    jest.fn((id: string) => ({
+      id,
+      getFilename: jest.fn(async () => "asset"),
+    })),
+    { create: jest.fn(async () => ({ id: "asset" })) },
+  );
   return {
-    Asset: { create: jest.fn(async () => ({ id: "asset" })) },
+    Asset,
     getPermissionsAsync: jest.fn(async () => granted),
     requestPermissionsAsync: jest.fn(async () => granted),
   };

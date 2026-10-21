@@ -50,6 +50,8 @@ export const Layout = {
   check: { sm: 22, smTick: 12, smRing: 2, lg: 38, lgTick: 19 },
   // 08 bottom action bar.
   actionBar: { padTop: 10, padX: 16, padBottom: 14, gap: 8, rowGap: 10 },
+  // 07: the upload button under the grid, at the end of the row, with an accent shadow.
+  uploadBar: { padTop: 10, padBottom: 12, shadowY: 4, shadowBlur: 14 },
   // 09 and 10: the bottom bar over the photo or video.
   viewer: {
     barTop: 14,

@@ -6,6 +6,7 @@ import {
 } from "@components/fileHarbourComponent/gallery/GalleryGrid";
 import { GridCell } from "@components/fileHarbourComponent/gallery/GridCell";
 import { SelectionToolbar } from "@components/fileHarbourComponent/gallery/SelectionToolbar";
+import { UploadButton } from "@components/fileHarbourComponent/gallery/UploadButton";
 import { Thumbnail } from "@components/fileHarbourComponent/shared/Thumbnail";
 
 // expo-image is native. The mock records the props of each image that renders.
@@ -205,5 +206,22 @@ describe("GalleryGrid", () => {
     );
     await fireEvent(screen.getByLabelText("Photo, IMG_2.jpg"), "longPress");
     expect(onLongPressCell).toHaveBeenCalledWith("2");
+  });
+});
+
+describe("UploadButton (07)", () => {
+  it("is a labelled button that calls onPress, and is off while a file uploads", async () => {
+    const onPress = jest.fn();
+    await render(<UploadButton onPress={onPress} />);
+    const button = screen.getByRole("button", {
+      name: "Upload a photo or video",
+    });
+    await fireEvent.press(button);
+    expect(onPress).toHaveBeenCalledTimes(1);
+
+    await render(<UploadButton onPress={onPress} disabled />);
+    expect(
+      screen.getByRole("button", { name: "Upload a photo or video" }),
+    ).toBeDisabled();
   });
 });

@@ -3,9 +3,16 @@ import type { ReactElement } from "react";
 
 import FolderScreen from "@/app/(tabs)/folders/[folderId]";
 import { loadFolderFiles, loadThumbnail, syncIndex } from "@/index/sync";
-import { getSaveAccess, requestSaveAccess } from "@/media/gallery";
+import {
+  getReadAccess,
+  getSaveAccess,
+  requestReadAccess,
+  requestSaveAccess,
+} from "@/media/gallery";
+import { pickOneForUpload } from "@/media/picker";
 import { addDownloads } from "@/transfer/downloads";
-import type { FolderFile } from "@/types/domain";
+import { uploadFile } from "@/transfer/queue";
+import type { FolderFile, ServiceResult } from "@/types/domain";
 
 import { mockParams, mockRouter, mockStack, resetAuthMocks } from "./authMocks";
 
@@ -16,9 +23,13 @@ jest.mock("@/index/sync", () => ({
   syncIndex: jest.fn(),
 }));
 jest.mock("@/media/gallery", () => ({
+  getReadAccess: jest.fn(async () => "granted"),
   getSaveAccess: jest.fn(),
+  requestReadAccess: jest.fn(async () => "granted"),
   requestSaveAccess: jest.fn(),
 }));
+jest.mock("@/media/picker", () => ({ pickOneForUpload: jest.fn() }));
+jest.mock("@/transfer/queue", () => ({ uploadFile: jest.fn() }));
 jest.mock("@/transfer/downloads", () => ({
   addDownloads: jest.fn(),
   MAX_PARALLEL_DOWNLOADS: 4,
@@ -31,6 +42,8 @@ const thumb = loadThumbnail as jest.Mock;
 const sync = syncIndex as jest.Mock;
 const add = addDownloads as jest.Mock;
 const getAccess = getSaveAccess as jest.Mock;
+const pick = pickOneForUpload as jest.Mock;
+const upload = uploadFile as jest.Mock;
 const requestAccess = requestSaveAccess as jest.Mock;
 
 const MB = 1024 ** 2;
@@ -73,6 +86,18 @@ beforeEach(() => {
   add.mockReset().mockReturnValue(1);
   getAccess.mockReset().mockResolvedValue("granted");
   requestAccess.mockReset().mockResolvedValue("granted");
+  pick.mockReset().mockResolvedValue({
+    ok: true,
+    value: {
+      uri: "file:///c/IMG_9.jpg",
+      name: "IMG_9.jpg",
+      mimeType: "image/jpeg",
+      size: 2 * MB,
+      kind: "photo",
+      temporary: true,
+    },
+  });
+  upload.mockReset();
 });
 
 describe("Folder 07 — grid", () => {
@@ -360,5 +385,90 @@ describe("Folder 07 — states", () => {
       ),
     ).toBeOnTheScreen();
     expect(load).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("Folder 07 — upload one file", () => {
+  const uploadButton = () =>
+    screen.getByRole("button", { name: "Upload a photo or video" });
+
+  it("uploads the picked file to this folder, shows the state, and reads the folder again", async () => {
+    let finish: (r: ServiceResult<void>) => void = () => {};
+    upload.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
+    await render(<FolderScreen />);
+    await screen.findByText("3 items · 6 MB");
+    await fireEvent.press(uploadButton());
+    expect(upload).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "IMG_9.jpg" }),
+      "Goa 2024/Beach",
+      expect.any(Function),
+    );
+    expect(screen.getByText("Uploading IMG_9.jpg")).toBeOnTheScreen();
+    // One upload at a time.
+    expect(uploadButton()).toBeDisabled();
+
+    load.mockResolvedValue({
+      ok: true,
+      value: [...files, file(9, { name: "IMG_9.jpg" })],
+    });
+    await act(async () => finish({ ok: true, value: undefined }));
+    expect(screen.getByText("IMG_9.jpg is uploaded.")).toBeOnTheScreen();
+    expect(await screen.findByText("4 items · 8 MB")).toBeOnTheScreen();
+    expect(uploadButton()).toBeEnabled();
+    // The upload synced already: the screen reads the folder only.
+    expect(sync).not.toHaveBeenCalled();
+  });
+
+  it("asks for read access before the picker opens, and opens it when access is denied", async () => {
+    const order: string[] = [];
+    (getReadAccess as jest.Mock).mockImplementationOnce(async () => {
+      order.push("check");
+      return "undetermined";
+    });
+    (requestReadAccess as jest.Mock).mockImplementationOnce(async () => {
+      order.push("ask");
+      return "denied";
+    });
+    pick.mockImplementationOnce(async () => {
+      order.push("pick");
+      return { ok: true, value: null };
+    });
+    await render(<FolderScreen />);
+    await screen.findByText("3 items · 6 MB");
+    await fireEvent.press(uploadButton());
+    expect(order).toEqual(["check", "ask", "pick"]);
+  });
+
+  it("shows a rate limit with the wait time", async () => {
+    upload.mockResolvedValue({
+      ok: false,
+      error: { kind: "rate_limited", code: "FLOOD_WAIT_12", retryAfter: 12 },
+    });
+    await render(<FolderScreen />);
+    await screen.findByText("3 items · 6 MB");
+    await fireEvent.press(uploadButton());
+    expect(
+      screen.getByText("Telegram asks the app to wait 12 s. Then try again."),
+    ).toBeOnTheScreen();
+  });
+
+  it("shows the button in an empty folder, and not during a selection", async () => {
+    load.mockResolvedValue({ ok: true, value: [] });
+    await render(<FolderScreen />);
+    await screen.findByText("No files yet");
+    expect(uploadButton()).toBeOnTheScreen();
+
+    load.mockResolvedValue({ ok: true, value: files });
+    await render(<FolderScreen />);
+    await screen.findByText("3 items · 6 MB");
+    await longPress("Photo, IMG_3.jpg");
+    expect(
+      screen.queryByRole("button", { name: "Upload a photo or video" }),
+    ).toBeNull();
   });
 });

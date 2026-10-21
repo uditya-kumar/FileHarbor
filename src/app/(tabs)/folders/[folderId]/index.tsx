@@ -2,6 +2,7 @@ import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 
 import { GalleryGrid } from "@components/fileHarbourComponent/gallery/GalleryGrid";
 import { SelectionToolbar } from "@components/fileHarbourComponent/gallery/SelectionToolbar";
+import { UploadButton } from "@components/fileHarbourComponent/gallery/UploadButton";
 import { Banner } from "@components/fileHarbourComponent/shared/Banner";
 import { Button } from "@components/fileHarbourComponent/shared/Button";
 import { Screen } from "@components/fileHarbourComponent/shared/Screen";
@@ -10,11 +11,13 @@ import { TitleBlock } from "@components/fileHarbourComponent/shared/TitleBlock";
 import { useFolderContents } from "@/hooks/useFolderContents";
 import { useMediaPermissions } from "@/hooks/useMediaPermissions";
 import { useSelection } from "@/hooks/useSelection";
+import { useUpload } from "@/hooks/useUpload";
 import { addDownloads, MAX_PARALLEL_DOWNLOADS } from "@/transfer/downloads";
 
 // 07 folder grid and 08 multi-select. `folderId` is the folder path from the captions, e.g.
 // "Holiday/Beach" (spec §1). A photo or video cell opens the viewer (09, 10); another file opens
-// sheet 11 (spec §8.5). The More menu comes with the folder operations (Phase 8).
+// sheet 11 (spec §8.5). The upload button sends one photo or video to this folder (spec §11
+// step 5). The More menu comes with the folder operations.
 
 export default function FolderScreen() {
   const router = useRouter();
@@ -25,6 +28,8 @@ export default function FolderScreen() {
     selection.active ? selection.selected : null,
   );
   const media = useMediaPermissions("Download");
+  const upload = useUpload(folderId ?? "", folder.reload);
+  const uploadNotice = upload.notice;
   const picked = folder.selection;
   const notice = folder.notice;
   // flood_wait uses warn, never danger: red makes users retry (CLAUDE.md §6).
@@ -50,6 +55,12 @@ export default function FolderScreen() {
     if (toGallery && !(await media.ensureSave())) return;
     addDownloads(picked.files);
     selection.exit();
+  };
+  // Android asks for read access before the picker opens, not after the pick: the app reads
+  // the real file name with it. A denied access still uploads, with the picker name.
+  const startUpload = async (): Promise<void> => {
+    await media.ensureRead();
+    await upload.start();
   };
   const longPressCell = (key: string): void => {
     if (selection.active) selection.toggle(key);
@@ -124,6 +135,14 @@ export default function FolderScreen() {
         />
       ) : null}
 
+      {folder.status === "empty" && uploadNotice ? (
+        <Banner
+          text={uploadNotice.text}
+          icon={uploadNotice.icon}
+          tone={uploadNotice.tone}
+        />
+      ) : null}
+
       {folder.status === "empty" ? (
         <TitleBlock
           align="center"
@@ -154,6 +173,13 @@ export default function FolderScreen() {
               {picked && media.notice ? (
                 <Banner text={media.notice} icon="image" tone="warn" />
               ) : null}
+              {uploadNotice ? (
+                <Banner
+                  text={uploadNotice.text}
+                  icon={uploadNotice.icon}
+                  tone={uploadNotice.tone}
+                />
+              ) : null}
             </>
           }
         />
@@ -168,6 +194,13 @@ export default function FolderScreen() {
           onDownload={
             picked.files.length > 0 ? () => void download() : undefined
           }
+        />
+      ) : null}
+
+      {!picked && (folder.status === "grid" || folder.status === "empty") ? (
+        <UploadButton
+          onPress={() => void startUpload()}
+          disabled={upload.busy}
         />
       ) : null}
     </Screen>

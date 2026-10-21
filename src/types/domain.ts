@@ -84,6 +84,23 @@ export type FileProgress = {
   localUri: string | null;
 };
 
+/** A file that the user picked to upload (07 upload button). */
+export type UploadSource = {
+  /** A file:// URI that TDLib can read. */
+  uri: string;
+  /** The name for the caption, from the gallery. */
+  name: string;
+  mimeType: string;
+  /** Bytes. 0 when unknown. */
+  size: number;
+  kind: MediaKind;
+  /** True for a copy in the app cache: it is deleted after the upload. */
+  temporary: boolean;
+};
+
+/** The upload state of one file: bytes on Telegram's servers. */
+export type UploadProgress = { uploaded: number; size: number };
+
 /**
  * A file in the Downloads tab (12). "paused": the user stopped it; the parts on the device
  * stay. "failed": TDLib gave an error; the user can start it again.

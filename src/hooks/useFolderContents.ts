@@ -197,6 +197,11 @@ export function useFolderContents(
     });
   }, [dirPath, apply]);
 
+  /** Reads this folder again from dir_index, with no sync (after an upload that synced). */
+  const reload = useCallback((): void => {
+    void loadFolderFiles(dirPath).then(apply);
+  }, [dirPath, apply]);
+
   const all = files ?? [];
   const totalSize = all.reduce((sum, f) => sum + f.size, 0);
   const status: FolderContentsStatus =
@@ -224,5 +229,6 @@ export function useFolderContents(
     refreshing: pulled,
     onVisible,
     refresh,
+    reload,
   };
 }

@@ -87,6 +87,13 @@ export type TdLocalFile = {
   downloaded_size: number;
 };
 
+export type TdRemoteFile = {
+  is_uploading_active: boolean;
+  is_uploading_completed: boolean;
+  /** The bytes that are on Telegram's servers. Upload progress (spec §4.2). */
+  uploaded_size: number;
+};
+
 export type TdFile = {
   "@type": "file";
   /** Valid in this TDLib instance only. Read it again from the message after a restart. */
@@ -95,6 +102,8 @@ export type TdFile = {
   expected_size: number;
   /** Absent in old fixtures. Every file from TDLib has it. */
   local?: TdLocalFile;
+  /** Absent in old fixtures. */
+  remote?: TdRemoteFile;
 };
 
 export type TdThumbnail = {

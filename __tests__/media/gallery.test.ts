@@ -5,7 +5,10 @@ import {
 } from "expo-media-library";
 
 import {
+  getReadAccess,
   getSaveAccess,
+  mediaFileName,
+  requestReadAccess,
   requestSaveAccess,
   saveToGallery,
 } from "@/media/gallery";
@@ -93,6 +96,45 @@ describe("gallery — access", () => {
   it("gives denied when the native call fails, and does not throw", async () => {
     getPerm.mockRejectedValueOnce(new Error("no activity"));
     expect(await getSaveAccess()).toBe("denied");
+  });
+
+  it("asks for read access to photos and videos for the upload name", async () => {
+    getPerm.mockResolvedValueOnce(response(false, "undetermined", true));
+    expect(await getReadAccess()).toBe("undetermined");
+    expect(getPerm).toHaveBeenCalledWith(false, ["photo", "video"]);
+    requestPerm.mockResolvedValueOnce(response(true, "granted", true));
+    expect(await requestReadAccess()).toBe("granted");
+    expect(requestPerm).toHaveBeenCalledWith(false, ["photo", "video"]);
+  });
+});
+
+describe("gallery — media file name", () => {
+  const AssetClass = Asset as unknown as jest.Mock;
+
+  it("reads the name of the item in the media store", async () => {
+    AssetClass.mockImplementationOnce((id: string) => ({
+      id,
+      getFilename: async () => "graphify_2026-10-21_10-38-31.mp4",
+    }));
+    await expect(mediaFileName("1000159075", "video")).resolves.toBe(
+      "graphify_2026-10-21_10-38-31.mp4",
+    );
+    expect(AssetClass).toHaveBeenLastCalledWith(
+      "content://media/external/video/media/1000159075",
+    );
+    await mediaFileName("5", "photo");
+    expect(AssetClass).toHaveBeenLastCalledWith(
+      "content://media/external/images/media/5",
+    );
+  });
+
+  it("gives null when the app cannot read the item", async () => {
+    AssetClass.mockImplementationOnce(() => ({
+      getFilename: async () => {
+        throw new Error("permission denied");
+      },
+    }));
+    await expect(mediaFileName("1", "photo")).resolves.toBeNull();
   });
 });
 

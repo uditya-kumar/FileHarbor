@@ -30,6 +30,8 @@ const light = {
   textTertiary: "#9C9C98",
   accent: "#2383E2",
   accentSoft: "#EDF4FD",
+  /** The 07 upload button shadow: accent at 25 % (Design.pen). */
+  accentShadow: "#2383E240",
   onAccent: "#FFFFFF",
   success: "#2E7D4F",
   warn: "#B26B00",
@@ -52,6 +54,7 @@ const dark: ColorTokens = {
   textTertiary: "#74746F",
   accent: "#4C9AEA",
   accentSoft: "#16263A",
+  accentShadow: "#4C9AEA40",
   onAccent: "#FFFFFF",
   success: "#4CAF75",
   warn: "#D9933A",
